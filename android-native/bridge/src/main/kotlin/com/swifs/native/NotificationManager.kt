@@ -37,6 +37,21 @@ class NotificationManager(private val context: Context) {
         }
     }
 
+    private fun getCircleBitmap(bitmap: Bitmap): Bitmap {
+        val output = Bitmap.createBitmap(bitmap.width, bitmap.height, Bitmap.Config.ARGB_8888)
+        val canvas = android.graphics.Canvas(output)
+        val paint = android.graphics.Paint()
+        val rect = android.graphics.Rect(0, 0, bitmap.width, bitmap.height)
+        val rectF = android.graphics.RectF(rect)
+        paint.isAntiAlias = true
+        canvas.drawARGB(0, 0, 0, 0)
+        paint.color = android.graphics.Color.WHITE
+        canvas.drawOval(rectF, paint)
+        paint.xfermode = android.graphics.PorterDuffXfermode(android.graphics.PorterDuff.Mode.SRC_IN)
+        canvas.drawBitmap(bitmap, rect, rect, paint)
+        return output
+    }
+
     fun showNotification(id: Int, title: String, body: String, avatarUrl: String?) {
         thread {
             var bitmap: Bitmap? = null
@@ -63,7 +78,12 @@ class NotificationManager(private val context: Context) {
                 .setContentIntent(pendingIntent)
 
             if (bitmap != null) {
-                builder.setLargeIcon(bitmap)
+                try {
+                    val circularBitmap = getCircleBitmap(bitmap)
+                    builder.setLargeIcon(circularBitmap)
+                } catch (e: Exception) {
+                    builder.setLargeIcon(bitmap)
+                }
             }
 
             val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager

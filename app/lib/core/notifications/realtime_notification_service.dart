@@ -46,6 +46,10 @@ class RealtimeNotificationService {
     if (type == 'follow_accept') {
       title = 'Follow request accepted';
       body = '$actorName ($actorHandle) accepted your follow request.';
+    } else if (type == 'message') {
+      title = 'New message';
+      final preview = record['preview'] ?? 'Sent you a message.';
+      body = '$actorName: $preview';
     }
 
     _notifId++;
