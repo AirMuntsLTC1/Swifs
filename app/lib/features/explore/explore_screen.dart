@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../../core/theme/swifs_icon.dart';
+import 'package:lucide_icons_flutter_plus/lucide_icons_flutter_plus.dart';
 import '../../core/mocks/mock_explore.dart';
 
 const Color kPrimary = Color(0xFFFF6B35);
@@ -19,7 +21,7 @@ class ExploreScreen extends StatelessWidget {
               child: TextField(
                 decoration: InputDecoration(
                   hintText: 'Search Swifs',
-                  prefixIcon: const Icon(Icons.search),
+                  prefixIcon: const SwifsIcon(LucideIcons.search),
                   filled: true,
                   fillColor: Colors.grey.shade100,
                   border: OutlineInputBorder(
@@ -58,7 +60,7 @@ class ExploreScreen extends StatelessWidget {
               delegate: SliverChildBuilderDelegate(
                 (_, i) => Container(
                   color: Colors.grey.shade200,
-                  child: const Center(child: Icon(Icons.image, color: Colors.grey)),
+                  child: const Center(child: SwifsIcon(LucideIcons.image, color: Colors.grey)),
                 ),
                 childCount: 24,
               ),

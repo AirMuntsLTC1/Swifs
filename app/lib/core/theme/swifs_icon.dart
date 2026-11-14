@@ -7,7 +7,7 @@ class SwifsIcon extends StatelessWidget {
   final Color? color;
   final double strokeWidth;
 
-  const SwifsIcon(this.icon, {super.key, this.size = 24, this.color, this.strokeWidth = 2.2});
+  const SwifsIcon(this.icon, {super.key, this.size = 24, this.color, this.strokeWidth = 2.0});
 
   @override
   Widget build(BuildContext context) {

@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../../core/theme/swifs_icon.dart';
+import 'package:lucide_icons_flutter_plus/lucide_icons_flutter_plus.dart';
 
 const Color kPrimary = Color(0xFFFF6B35);
 
@@ -22,7 +24,7 @@ class ProfileScreen extends StatelessWidget {
                         const CircleAvatar(
                           radius: 42,
                           backgroundColor: Colors.grey,
-                          child: Icon(Icons.person, size: 42, color: Colors.white),
+                          child: SwifsIcon(LucideIcons.user, size: 42, color: Colors.white),
                         ),
                         const SizedBox(width: 20),
                         Expanded(
@@ -69,7 +71,7 @@ class ProfileScreen extends StatelessWidget {
                           style: OutlinedButton.styleFrom(
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                           ),
-                          child: const Icon(Icons.settings_outlined, size: 20),
+                          child: const SwifsIcon(LucideIcons.settings, size: 20),
                         ),
                       ],
                     ),
@@ -83,9 +85,9 @@ class ProfileScreen extends StatelessWidget {
                 labelColor: kPrimary,
                 unselectedLabelColor: Colors.grey,
                 tabs: [
-                  Tab(icon: Icon(Icons.grid_on)),
-                  Tab(icon: Icon(Icons.play_circle_outline)),
-                  Tab(icon: Icon(Icons.bookmark_border)),
+                  Tab(icon: SwifsIcon(LucideIcons.grid3x3)),
+                  Tab(icon: SwifsIcon(LucideIcons.playCircle)),
+                  Tab(icon: SwifsIcon(LucideIcons.bookmark)),
                 ],
               ),
             ),
@@ -102,7 +104,7 @@ class ProfileScreen extends StatelessWidget {
                 itemCount: 12,
                 itemBuilder: (_, i) => Container(
                   color: Colors.grey.shade200,
-                  child: const Center(child: Icon(Icons.image, color: Colors.grey)),
+                  child: const Center(child: SwifsIcon(LucideIcons.image, color: Colors.grey)),
                 ),
               );
             }),
