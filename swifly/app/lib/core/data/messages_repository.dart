@@ -12,6 +12,11 @@ class DirectMessage {
   final String? storyId;
   bool pending;
   bool failed;
+  DateTime? pinnedAt;
+  /// emoji -> how many people reacted with it
+  final Map<String, int> reactions = {};
+  /// emojis I have used on this message
+  final Set<String> myReactions = {};
 
   DirectMessage({
     required this.id,
@@ -22,6 +27,7 @@ class DirectMessage {
     this.readAt,
     this.replyToId,
     this.storyId,
+    this.pinnedAt,
     this.pending = false,
     this.failed = false,
   });
@@ -71,7 +77,7 @@ class MessagesRepository {
   MessagesRepository._();
   static final MessagesRepository instance = MessagesRepository._();
 
-  static const _select = 'id, sender, recipient, text, created_at, read_at, reply_to_id, story_id';
+  static const _select = 'id, sender, recipient, text, created_at, read_at, reply_to_id, story_id, pinned_at';
 
   SupabaseClient get _db => Supabase.instance.client;
 
@@ -92,6 +98,7 @@ class MessagesRepository {
         readAt: r['read_at'] == null ? null : DateTime.tryParse(r['read_at'].toString()),
         replyToId: r['reply_to_id']?.toString(),
         storyId: r['story_id']?.toString(),
+        pinnedAt: r['pinned_at'] == null ? null : DateTime.tryParse(r['pinned_at'].toString())?.toLocal(),
       );
 
   Future<Map<String, Map<String, dynamic>>> _profiles(Iterable<String> ids) async {
@@ -154,7 +161,25 @@ class MessagesRepository {
         .or('and(sender.eq.$me,recipient.eq.$otherId),and(sender.eq.$otherId,recipient.eq.$me)')
         .order('created_at', ascending: false)
         .limit(limit);
-    return rows.map((r) => _fromRow(Map<String, dynamic>.from(r))).toList().reversed.toList();
+    final list = rows.map((r) => _fromRow(Map<String, dynamic>.from(r))).toList();
+    if (list.isEmpty) return list;
+
+    final byId = {for (final m in list) m.id: m};
+    final ids = byId.keys.toList();
+
+    final hidden = await _db.from('message_hidden').select('message_id').eq('user_id', me).inFilter('message_id', ids);
+    final hiddenIds = {for (final h in hidden) h['message_id'].toString()};
+
+    final reactRows = await _db.from('message_reactions').select('message_id, user_id, emoji').inFilter('message_id', ids);
+    for (final r in reactRows) {
+      final m = byId[r['message_id'].toString()];
+      if (m == null) continue;
+      final emoji = r['emoji'].toString();
+      m.reactions[emoji] = (m.reactions[emoji] ?? 0) + 1;
+      if (r['user_id'].toString() == me) m.myReactions.add(emoji);
+    }
+
+    return list.where((m) => !hiddenIds.contains(m.id)).toList();
   }
 
   /// Marks everything they sent me as read.
@@ -254,8 +279,55 @@ class MessagesRepository {
           table: 'messages',
           callback: (_) => onChange(),
         )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'message_reactions',
+          callback: (_) => onChange(),
+        )
         .subscribe();
   }
 
   Future<void> unsubscribe(RealtimeChannel channel) => _db.removeChannel(channel);
+
+  /// Adds or removes one emoji reaction from my side.
+  Future<void> setReaction(String messageId, String emoji, {required bool on}) async {
+    final me = _me;
+    if (on) {
+      await _db.from('message_reactions').upsert(
+            {'message_id': messageId, 'user_id': me, 'emoji': emoji},
+            onConflict: 'message_id,user_id,emoji',
+            ignoreDuplicates: true,
+          );
+    } else {
+      await _db
+          .from('message_reactions')
+          .delete()
+          .eq('message_id', messageId)
+          .eq('user_id', me)
+          .eq('emoji', emoji);
+    }
+  }
+
+  Future<void> setPinned(String messageId, {required bool pinned}) async {
+    await _db
+        .from('messages')
+        .update({'pinned_at': pinned ? DateTime.now().toUtc().toIso8601String() : null})
+        .eq('id', messageId);
+  }
+
+  /// Removes the message from my view only.
+  Future<void> hideForMe(String messageId) async {
+    final me = _me;
+    await _db.from('message_hidden').upsert(
+          {'message_id': messageId, 'user_id': me},
+          onConflict: 'message_id,user_id',
+          ignoreDuplicates: true,
+        );
+  }
+
+  Future<void> report(String messageId, String reason) async {
+    final me = _me;
+    await _db.from('message_reports').insert({'message_id': messageId, 'reporter': me, 'reason': reason});
+  }
 }
