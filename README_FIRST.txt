@@ -1,10 +1,11 @@
-SWIFS PATCH 9: likes, comments and shares on every post.
+SWIFS PATCH 10: unread badges and live updates.
 
   cd ~/Swifs
-  unzip -o ~/storage/downloads/swifs-patch-9.zip
-  supabase db push --remote          # creates post_counts
-  python3 apply_post_counts.py       # stops with a message if anything doesn't match
-  rm -f apply_post_counts.py
+  unzip -o ~/storage/downloads/swifs-patch-10.zip
+  python3 apply_realtime_badges.py
+  rm -f apply_realtime_badges.py
   git add -A
-  git commit -m "Patch 9: likes, comments and shares on posts"
+  git commit -m "Patch 10: unread badges and realtime"
   git push
+
+No database change is needed.

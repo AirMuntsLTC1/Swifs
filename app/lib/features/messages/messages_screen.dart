@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'dart:async';
 import 'package:flutter/material.dart';
+import '../../core/notifications/realtime_notification_service.dart';
 import 'package:lucide_icons_flutter_plus/lucide_icons_flutter_plus.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/data/messages_repository.dart';
@@ -31,6 +33,7 @@ class _MessagesScreenState extends State<MessagesScreen> {
   String _myHandle = '';
   RealtimeChannel? _channel;
   Timer? _debounce;
+  StreamSubscription<String>? _hubSub;
 
   @override
   void initState() {
@@ -38,10 +41,14 @@ class _MessagesScreenState extends State<MessagesScreen> {
     _load();
     _loadHandle();
     _channel = _repo.subscribe(_scheduleReload);
+    _hubSub = RealtimeHub.instance.changes.listen((t) {
+      if (t == 'messages' || t == 'resume') _scheduleReload();
+    });
   }
 
   @override
   void dispose() {
+    _hubSub?.cancel();
     _debounce?.cancel();
     final ch = _channel;
     if (ch != null) _repo.unsubscribe(ch);
@@ -402,10 +409,12 @@ class _MessagesScreenState extends State<MessagesScreen> {
               ),
             ),
             if (unread)
-              Container(
-                width: 10,
-                height: 10,
-                decoration: const BoxDecoration(color: _kPrimary, shape: BoxShape.circle),
+              Padding(
+                padding: const EdgeInsets.only(left: 8),
+                child: Text(
+                  '${c.unread}',
+                  style: const TextStyle(color: Colors.red, fontSize: 14, fontWeight: FontWeight.w700),
+                ),
               ),
           ],
         ),

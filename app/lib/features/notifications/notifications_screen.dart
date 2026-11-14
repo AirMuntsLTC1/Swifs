@@ -1,4 +1,7 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import '../../core/data/unread_counts.dart';
+import '../../core/notifications/realtime_notification_service.dart';
 import '../profile/user_profile_screen.dart';
 import 'package:lucide_icons_flutter_plus/lucide_icons_flutter_plus.dart';
 import '../../core/data/models.dart';
@@ -21,11 +24,31 @@ class NotificationsScreen extends StatefulWidget {
 class _NotificationsScreenState extends State<NotificationsScreen> {
   List<NotificationModel> _items = [];
   bool _loading = true;
+  StreamSubscription<String>? _hubSub;
+  Timer? _debounce;
 
   @override
   void initState() {
     super.initState();
     _load();
+    _hubSub = RealtimeHub.instance.changes.listen((t) {
+      if (t == 'notifications' || t == 'resume') _scheduleLoad();
+    });
+    UnreadCounts.instance.markAllNotificationsRead();
+  }
+
+  void _scheduleLoad() {
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 300), () {
+      if (mounted) _load();
+    });
+  }
+
+  @override
+  void dispose() {
+    _hubSub?.cancel();
+    _debounce?.cancel();
+    super.dispose();
   }
 
   Future<void> _load() async {

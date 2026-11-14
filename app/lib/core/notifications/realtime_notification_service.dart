@@ -25,7 +25,7 @@ class RealtimeHub {
     'posts', 'post_media', 'post_likes', 'post_saves', 'comments', 'comment_likes',
     'follows', 'profiles', 'stories', 'story_views', 'story_reactions', 'story_replies',
     'messages', 'message_reactions', 'message_hidden', 'groups', 'group_members',
-    'blocked_users', 'restricted_users', 'notes',
+    'blocked_users', 'restricted_users', 'notes', 'notifications',
   ];
 
   final StreamController<String> _changes = StreamController<String>.broadcast();
@@ -103,6 +103,15 @@ class RealtimeHub {
         start();
       });
     }
+  }
+
+  /// Rebuilds the live connection and tells open screens to reload.
+  void restart() {
+    stop();
+    _channelRef = null;
+    _userId = null;
+    start();
+    _changes.add('resume');
   }
 
   /// Disconnects (on sign-out).

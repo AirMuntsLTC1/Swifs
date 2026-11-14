@@ -12,6 +12,9 @@ import 'core/config/supabase_config.dart';
 import 'core/auth/auth_gate.dart';
 import 'core/network/interaction_queue.dart';
 import 'core/notifications/realtime_notification_service.dart';
+import 'core/notifications/realtime_lifecycle.dart';
+import 'core/data/unread_counts.dart';
+import 'core/widgets/count_badge.dart';
 
 const Color kPrimary = Color(0xFFFF6B35);
 
@@ -24,13 +27,16 @@ Future<void> main() async {
   void syncSession(Session? session) {
     if (session != null) {
       RealtimeHub.instance.start();
+      UnreadCounts.instance.start();
       InteractionQueue.instance.restore();
     } else {
       RealtimeHub.instance.stop();
+      UnreadCounts.instance.stop();
     }
   }
 
   syncSession(Supabase.instance.client.auth.currentSession);
+  RealtimeLifecycle.instance.attach();
   Supabase.instance.client.auth.onAuthStateChange.listen((state) => syncSession(state.session));
 
   runApp(const ProviderScope(child: SwifsApp()));
@@ -173,10 +179,12 @@ class _MainShellState extends State<MainShell> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            SwifsIcon(
-              icon,
-              size: 24,
-              color: color,
+            ValueListenableBuilder<int>(
+              valueListenable: UnreadCounts.instance.messages,
+              builder: (context, count, _) => CountBadge(
+                count: index == 2 ? count : 0,
+                child: SwifsIcon(icon, size: 24, color: color),
+              ),
             ),
             const SizedBox(height: 4),
             Text(

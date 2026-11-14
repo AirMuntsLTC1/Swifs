@@ -19,6 +19,8 @@ import '../../core/network/interaction_queue.dart';
 import '../comments/comments_sheet.dart';
 import '../create/create_post_screen.dart';
 import '../notifications/notifications_screen.dart';
+import '../../core/data/unread_counts.dart';
+import '../../core/widgets/count_badge.dart';
 import '../../core/widgets/count_text.dart';
 import '../../core/native/swifs_ffi.dart';
 import '../../core/notifications/realtime_notification_service.dart';
@@ -363,7 +365,13 @@ class _HomeScreenState extends State<HomeScreen> {
                 }
               ),
               IconButton(
-                icon: const SwifsIcon(LucideIcons.bell), 
+                icon: ValueListenableBuilder<int>(
+                  valueListenable: UnreadCounts.instance.notifications,
+                  builder: (context, count, _) => CountBadge(
+                    count: count,
+                    child: const SwifsIcon(LucideIcons.bell),
+                  ),
+                ), 
                 onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const NotificationsScreen())),
               ),
             ]),

@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'dart:async';
 import 'package:flutter/material.dart';
+import '../../core/notifications/realtime_notification_service.dart';
 import '../profile/user_profile_screen.dart';
 import 'package:flutter/services.dart';
 import 'package:lucide_icons_flutter_plus/lucide_icons_flutter_plus.dart';
@@ -62,6 +64,7 @@ class _ThreadScreenState extends State<ThreadScreen> {
   bool _loading = true;
   RealtimeChannel? _channel;
   Timer? _debounce;
+  StreamSubscription<String>? _hubSub;
 
   String? get _me => _repo.meOrNull;
 
@@ -70,10 +73,14 @@ class _ThreadScreenState extends State<ThreadScreen> {
     super.initState();
     _load();
     _channel = _repo.subscribe(_scheduleReload);
+    _hubSub = RealtimeHub.instance.changes.listen((t) {
+      if (t == 'messages' || t == 'resume') _scheduleReload();
+    });
   }
 
   @override
   void dispose() {
+    _hubSub?.cancel();
     _debounce?.cancel();
     final ch = _channel;
     if (ch != null) _repo.unsubscribe(ch);
