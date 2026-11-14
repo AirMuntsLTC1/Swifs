@@ -29,41 +29,63 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   Widget build(BuildContext context) {
     return const Scaffold(
-      backgroundColor: Color(0xFFFF6B35), // Swifs Orange
+      backgroundColor: Color(0xFFFF5733), // Exact orange from screenshot
       body: Center(
-        child: SwifsPlaneLogo(),
+        child: SizedBox(
+          width: 180,
+          height: 180,
+          child: CustomPaint(painter: PaperPlanePainter()),
+        ),
       ),
     );
   }
 }
 
-// Custom widget to draw the 3D-looking paper plane using standard Icons
-class SwifsPlaneLogo extends StatelessWidget {
-  const SwifsPlaneLogo({super.key});
+// Custom Painter to draw the exact 3D paper plane from the screenshot
+class PaperPlanePainter extends CustomPainter {
+  const PaperPlanePainter();
 
   @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 120,
-      height: 120,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFFFF6B35).withOpacity(0.4), // Orange glow
-            blurRadius: 30,
-            spreadRadius: 10,
-          ),
-        ],
-      ),
-      child: Transform.rotate(
-        angle: -0.2, // Slight tilt like the screenshot
-        child: const Icon(
-          Icons.send_rounded, // Solid paper plane
-          size: 100,
-          color: Colors.white,
-        ),
-      ),
-    );
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()..style = PaintingStyle.fill;
+    
+    // Scale factor based on 700x700 bounding box
+    final w = size.width;
+    final h = size.height;
+
+    // Rotate the canvas slightly
+    canvas.translate(w / 2, h / 2);
+    canvas.rotate(-0.2); // Tilt right
+    canvas.translate(-w / 2, -h / 2);
+
+    // Left Wing (White)
+    paint.color = Colors.white;
+    final leftWing = Path()
+      ..moveTo(w * 0.1, h * 0.4)
+      ..lineTo(w * 0.9, h * 0.1)
+      ..lineTo(w * 0.3, h * 0.7)
+      ..close();
+    canvas.drawPath(leftWing, paint);
+
+    // Right Wing (Light shadow)
+    paint.color = const Color(0xFFFFF0EB);
+    final rightWing = Path()
+      ..moveTo(w * 0.9, h * 0.1)
+      ..lineTo(w * 0.5, h * 0.9)
+      ..lineTo(w * 0.3, h * 0.7)
+      ..close();
+    canvas.drawPath(rightWing, paint);
+
+    // Fold (Darker shadow)
+    paint.color = const Color(0xFFFFD1C1);
+    final fold = Path()
+      ..moveTo(w * 0.5, h * 0.9)
+      ..lineTo(w * 0.3, h * 0.7)
+      ..lineTo(w * 0.6, h * 0.6)
+      ..close();
+    canvas.drawPath(fold, paint);
   }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

@@ -83,6 +83,10 @@ jobs:
         working-directory: app
         run: flutter pub get
 
+      - name: Generate App Icons
+        working-directory: app
+        run: dart run flutter_launcher_icons
+
       - name: Build arm64-only Release APK
         working-directory: app
         run: |
