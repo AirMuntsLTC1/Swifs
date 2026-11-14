@@ -1,1 +1,0 @@
-const List<String> mockTags = ['#swifs', '#sunsets', '#coffee', '#code', '#travel', '#fitness', '#food', '#art'];

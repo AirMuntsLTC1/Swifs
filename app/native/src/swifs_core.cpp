@@ -7,6 +7,12 @@ int swifs_feed_score(int likes, int comments, int views, int age_minutes) {
     return (int)(engagement / (age_minutes + 1));
 }
 
+int swifs_comment_score(int likes, int replies, int age_minutes) {
+    int64_t engagement = (int64_t)(likes * 2 + replies * 3) * 100;
+    if (age_minutes < 1) age_minutes = 1;
+    return (int)(engagement / (age_minutes + 1));
+}
+
 int swifs_hash_user(const char *username) {
     if (!username) return 0;
     uint32_t h = 2166136261u;

@@ -49,6 +49,30 @@ class SupabaseSocialRepository implements SocialRepository {
   }
 
   // ------------------------------------------------------------------
+  // Search & Explore
+  // ------------------------------------------------------------------
+
+  @override
+  Future<List<Map<String, dynamic>>> searchUsers(String query) => _guard(() async {
+        final rows = await _db
+            .from('profiles')
+            .select('id, username, display_name, followers_count, following_count')
+            .ilike('username', '%\$query%')
+            .limit(20);
+        return rows.map((r) => Map<String, dynamic>.from(r)).toList();
+      });
+
+  @override
+  Future<List<String>> fetchTrendingTags() => _guard(() async {
+        final rows = await _db
+            .from('trending_tags')
+            .select('tag')
+            .order('uses', ascending: false)
+            .limit(10);
+        return rows.map((r) => r['tag'].toString()).toList();
+      });
+
+  // ------------------------------------------------------------------
   // Feed
   // ------------------------------------------------------------------
 

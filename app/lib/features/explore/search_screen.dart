@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/theme/swifs_icon.dart';
 import 'package:lucide_icons_flutter_plus/lucide_icons_flutter_plus.dart';
-import '../../core/mocks/mock_users.dart';
+import '../../core/data/social.dart';
 
 const Color kPrimary = Color(0xFFFF6B35);
 
@@ -12,8 +12,24 @@ class SearchScreen extends StatefulWidget {
 }
 
 class _SearchScreenState extends State<SearchScreen> {
-  final List<Map<String, dynamic>> _users = mockUsers.map((u) => {...u}).toList();
+  List<Map<String, dynamic>> _users = [];
+  bool _isLoading = true;
   final TextEditingController _searchController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchUsers('');
+  }
+
+  Future<void> _fetchUsers(String query) async {
+    try {
+      final users = await social.searchUsers(query);
+      if (mounted) setState(() { _users = users; _isLoading = false; });
+    } catch (_) {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
 
   @override
   void dispose() {
@@ -41,6 +57,7 @@ class _SearchScreenState extends State<SearchScreen> {
           child: TextField(
             controller: _searchController,
             autofocus: true,
+            onChanged: (v) => _fetchUsers(v),
             style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w400),
             decoration: InputDecoration(
               hintText: 'Search Swifs...',
@@ -77,11 +94,11 @@ class _SearchScreenState extends State<SearchScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(user['name'], style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                      Text(user['display_name'] ?? user['username'], style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
                       Text('@${user['username']}', style: const TextStyle(color: Colors.grey, fontSize: 13)),
                       const SizedBox(height: 4),
                       Text(
-                        '${user['followers']} followers · ${user['following']} following',
+                        '${user['followers_count'] ?? 0} followers · ${user['following_count'] ?? 0} following',
                         style: const TextStyle(color: Colors.grey, fontSize: 12),
                       ),
                     ],

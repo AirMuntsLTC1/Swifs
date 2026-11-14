@@ -3,7 +3,7 @@ import 'package:pull_to_refresh_flutter3/pull_to_refresh_flutter3.dart';
 import '../../core/theme/swifs_refresh.dart';
 import '../../core/theme/swifs_icon.dart';
 import 'package:lucide_icons_flutter_plus/lucide_icons_flutter_plus.dart';
-import '../../core/mocks/mock_explore.dart';
+import '../../core/data/social.dart';
 import 'search_screen.dart';
 
 const Color kPrimary = Color(0xFFFF6B35);
@@ -16,6 +16,19 @@ class ExploreScreen extends StatefulWidget {
 
 class _ExploreScreenState extends State<ExploreScreen> {
   final RefreshController _refreshController = RefreshController(initialRefresh: false);
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchTags();
+  }
+
+  Future<void> _fetchTags() async {
+    try {
+      final tags = await social.fetchTrendingTags();
+      if (mounted) setState(() => _tags = tags);
+    } catch (_) {}
+  }
 
   @override
   void dispose() {
@@ -84,7 +97,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
                 child: Wrap(
                   spacing: 8,
                   runSpacing: 8,
-                  children: mockTags.map((t) => Chip(
+                  children: _tags.map((t) => Chip(
                     label: Text(t),
                     backgroundColor: Colors.grey.shade100,
                     side: BorderSide.none,

@@ -71,6 +71,12 @@ jobs:
         working-directory: app
         run: python3 ../scripts/wire_native.py
 
+      - name: Inject Supabase Config
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
+        run: python3 scripts/inject_secrets.py
+
       - name: Flutter pub get
         working-directory: app
         run: flutter pub get

@@ -6,6 +6,9 @@ import 'models.dart';
 /// "fetch..." reads ask the server and update the cache.
 /// Writes take the desired state (liked = true), so a retry still ends in the right state.
 abstract class SocialRepository {
+  Future<List<Map<String, dynamic>>> searchUsers(String query);
+  Future<List<String>> fetchTrendingTags();
+
   Future<List<FeedPost>?> cachedFeed();
   Future<List<FeedPost>> fetchFeed();
 
