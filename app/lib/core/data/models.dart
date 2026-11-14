@@ -231,3 +231,18 @@ class NotificationModel {
     this.isFollowing = false,
   });
 }
+
+
+class StoryViewerModel {
+  final String userId;
+  final String username;
+  final String? avatarUrl;
+  final String? reaction;
+
+  StoryViewerModel({
+    required this.userId,
+    required this.username,
+    this.avatarUrl,
+    this.reaction,
+  });
+}

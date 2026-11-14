@@ -6,6 +6,8 @@ import '../../core/data/stories_repository.dart';
 import '../../core/theme/swifs_icon.dart';
 import '../../core/widgets/user_avatar.dart';
 import 'story_layer_view.dart';
+import 'story_viewers_sheet.dart';
+import 'story_camera_screen.dart';
 
 const Color _kPrimary = Color(0xFFFF6B35);
 
@@ -237,15 +239,33 @@ class _StoryViewerScreenState extends State<StoryViewerScreen> with SingleTicker
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
                 child: _group.isMine
-                    ? Row(
-                        children: [
-                          const SwifsIcon(LucideIcons.eye, color: Colors.white, size: 20),
-                          const SizedBox(width: 8),
-                          Text(
-                            _viewers == null ? 'Viewers…' : '$_viewers ${_viewers == 1 ? 'viewer' : 'viewers'}',
-                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
-                          ),
-                        ],
+                    ? GestureDetector(
+                        onTap: () {
+                          _timer.stop();
+                          showModalBottomSheet(
+                            context: context,
+                            isScrollControlled: true,
+                            backgroundColor: Colors.transparent,
+                            builder: (_) => StoryViewersSheet(
+                              storyId: story.id,
+                              photoUrl: story.photoUrl,
+                              onAddToStory: () {
+                                Navigator.pop(context);
+                                Navigator.push(context, MaterialPageRoute(builder: (_) => const StoryCameraScreen()));
+                              },
+                            ),
+                          ).then((_) => _timer.forward());
+                        },
+                        child: Row(
+                          children: [
+                            const SwifsIcon(LucideIcons.eye, color: Colors.white, size: 20),
+                            const SizedBox(width: 8),
+                            Text(
+                              _viewers == null ? 'Viewers…' : '$_viewers ${_viewers == 1 ? 'viewer' : 'viewers'}',
+                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+                            ),
+                          ],
+                        ),
                       )
                     : Row(
                         children: [

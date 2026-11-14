@@ -35,6 +35,7 @@ abstract class SocialRepository {
   Future<CommentModel> addComment(String postId, String text, {String? parentId, String? tempId});
   Future<LikeResult> setCommentLike(String commentId, bool liked);
   Future<void> createPost(String caption, List<Map<String, dynamic>> media);
+  Future<List<StoryViewerModel>> fetchStoryViewers(String storyId);
 
   /// Runs one action from the outbox.
   Future<dynamic> run(OutboxOp op);

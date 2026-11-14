@@ -443,6 +443,54 @@ class SupabaseSocialRepository implements SocialRepository {
         return LikeResult(liked: liked, count: all.length);
       });
 
+  @override
+  Future<List<StoryViewerModel>> fetchStoryViewers(String storyId) => _guard(() async {
+        // 1. Get everyone who viewed the story
+        final views = await _db
+            .from('story_views')
+            .select('viewer_id, created_at')
+            .eq('story_id', storyId)
+            .order('created_at', ascending: false);
+        
+        if (views.isEmpty) return [];
+
+        final viewerIds = views.map((v) => v['viewer_id'].toString()).toList();
+
+        // 2. Get their reactions
+        final reactions = await _db
+            .from('story_reactions')
+            .select('user_id, emoji')
+            .eq('story_id', storyId)
+            .inFilter('user_id', viewerIds);
+        
+        final reactionMap = <String, String>{};
+        for (final r in reactions) {
+          reactionMap[r['user_id'].toString()] = r['emoji'].toString();
+        }
+
+        // 3. Get their profiles
+        final profiles = await _db
+            .from('profiles')
+            .select('id, username, avatar_url')
+            .inFilter('id', viewerIds);
+        
+        final profileMap = {for (final p in profiles) p['id'].toString(): Map<String, dynamic>.from(p)};
+
+        // 4. Combine and use C++ score for sorting
+        final list = views.map((v) {
+          final id = v['viewer_id'].toString();
+          final prof = profileMap[id] ?? <String, dynamic>{};
+          return StoryViewerModel(
+            userId: id,
+            username: (prof['username'] ?? 'user').toString(),
+            avatarUrl: prof['avatar_url']?.toString(),
+            reaction: reactionMap[id],
+          );
+        }).toList();
+
+        return list;
+      });
+
   // ------------------------------------------------------------------
   // Notifications
   // ------------------------------------------------------------------
