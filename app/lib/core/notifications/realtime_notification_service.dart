@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../push/push_service.dart';
 
 /// One live connection for the signed-in user.
 ///
@@ -86,6 +87,7 @@ class RealtimeHub {
 
     channel.subscribe(_onStatus);
     _channelRef = channel;
+    unawaited(PushService.instance.register());
   }
 
   /// Logs the connection state and reconnects if the channel fails or times out.

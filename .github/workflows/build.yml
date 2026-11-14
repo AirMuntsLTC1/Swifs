@@ -77,6 +77,11 @@ jobs:
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
         run: python3 scripts/inject_secrets.py
 
+      - name: Add Firebase config and Google services plugin
+        run: |
+          cp android-config/google-services.json app/android/app/google-services.json
+          python3 scripts/add_google_services.py
+
       - name: Flutter pub get
         working-directory: app
         run: flutter pub get
