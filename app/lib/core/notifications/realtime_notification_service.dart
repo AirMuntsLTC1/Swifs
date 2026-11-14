@@ -24,8 +24,8 @@ class RealtimeHub {
   static const List<String> watchedTables = [
     'posts', 'post_media', 'post_likes', 'post_saves', 'comments', 'comment_likes',
     'follows', 'profiles', 'stories', 'story_views', 'story_reactions', 'story_replies',
-    'messages', 'message_reactions', 'message_hidden', 'groups', 'group_members',
-    'blocked_users', 'restricted_users', 'notes', 'notifications',
+    'message_reactions', 'message_hidden', 'groups', 'group_members',
+    'blocked_users', 'restricted_users', 'notes',
   ];
 
   final StreamController<String> _changes = StreamController<String>.broadcast();
@@ -56,6 +56,21 @@ class RealtimeHub {
         table: table,
         callback: (_) => _changes.add(table),
       );
+    }
+
+    // Messages and notifications: inserts have their own bindings below, which show the
+    // phone notification. Updates and deletes only refresh the screens (read receipts,
+    // unsends, badge counts), so they get separate bindings here. Each table has one
+    // binding per event type.
+    for (final table in const ['messages', 'notifications']) {
+      for (final event in const [PostgresChangeEvent.update, PostgresChangeEvent.delete]) {
+        channel.onPostgresChanges(
+          event: event,
+          schema: 'public',
+          table: table,
+          callback: (_) => _changes.add(table),
+        );
+      }
     }
 
     // Activity: follows, requests, accepted requests, likes, comments, reactions, replies.
