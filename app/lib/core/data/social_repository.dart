@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'models.dart';
 
 /// Everything the app needs from the server. Screens only talk to this.
@@ -49,6 +51,10 @@ abstract class SocialRepository {
   Future<Map<String, dynamic>> fetchUserProfile(String userId);
   Future<List<FeedPost>> fetchUserPosts(String userId);
   Future<void> blockUser(String userId);
+
+  // Profile
+  Future<Map<String, dynamic>> updateMyProfile({String? displayName, String? bio});
+  Future<String> uploadMyAvatar(File file);
   Future<void> restrictUser(String userId);
 
 }

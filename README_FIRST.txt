@@ -1,10 +1,11 @@
-SWIFS PATCH 4: group chats in the inbox and thread, atomic group creation.
+SWIFS PATCH 5: profile editing (name, bio, avatar photo).
 
   cd ~/Swifs
-  unzip -o ~/storage/downloads/swifs-patch-4.zip
-  supabase db push --remote          # creates the create_group function
-  python3 apply_group_chat.py        # edits the Dart files (stops if anything doesn't match)
-  rm -f apply_group_chat.py
+  unzip -o ~/storage/downloads/swifs-patch-5.zip
+  python3 apply_profile_edit.py      # stops with a message if anything doesn't match
+  rm -f apply_profile_edit.py
   git add -A
-  git commit -m "Patch 4: group chats in inbox and thread"
+  git commit -m "Patch 5: profile editing"
   git push
+
+No database change is needed. The avatars bucket and profile update policies already exist.

@@ -4,6 +4,7 @@ import '../../core/theme/swifs_refresh.dart';
 import '../../core/theme/swifs_icon.dart';
 import 'package:lucide_icons_flutter_plus/lucide_icons_flutter_plus.dart';
 import 'settings_screen.dart';
+import 'edit_profile_screen.dart';
 import '../../core/data/models.dart';
 import '../../core/data/social.dart';
 import '../../core/widgets/post_media.dart';
@@ -52,6 +53,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
     } catch (_) {
       // Offline: keep whatever is already on screen.
     }
+  }
+
+  Future<void> _openEditProfile() async {
+    final saved = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(builder: (_) => EditProfileScreen(profile: _profile)),
+    );
+    if (saved == true) await _load();
   }
 
   String get _displayName {
@@ -128,6 +137,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             Text(_displayName, style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
                             SizedBox(height: 4),
                             Text('@${_profile['username'] ?? ''}', style: TextStyle(color: Colors.grey, fontSize: 14)),
+                            if ((_profile['bio'] ?? '').toString().trim().isNotEmpty)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 6),
+                                child: Text(_profile['bio'].toString(), style: const TextStyle(fontSize: 14)),
+                              ),
                           ],
                         ),
                       ),
@@ -136,7 +150,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         children: [
                           Expanded(
                             child: ElevatedButton(
-                              onPressed: () {},
+                              onPressed: () => _openEditProfile(),
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: kPrimary,
                                 foregroundColor: Colors.white,

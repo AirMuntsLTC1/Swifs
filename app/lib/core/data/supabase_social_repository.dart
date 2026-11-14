@@ -193,7 +193,7 @@ class SupabaseSocialRepository implements SocialRepository {
         final me = _me;
         final row = await _db
             .from('profiles')
-            .select('id, username, display_name, avatar_url, followers_count, following_count')
+            .select('id, username, display_name, avatar_url, followers_count, following_count, bio')
             .eq('id', me)
             .maybeSingle();
         final postCount = (await _db.from('posts').select('id').eq('author_id', me)).length;
@@ -201,6 +201,37 @@ class SupabaseSocialRepository implements SocialRepository {
         profile['posts_count'] = postCount;
         await _cache.write('cache.myprofile', profile);
         return profile;
+      });
+
+  @override
+  Future<Map<String, dynamic>> updateMyProfile({String? displayName, String? bio}) => _guard(() async {
+        final me = _me;
+        final changes = <String, dynamic>{};
+        if (displayName != null) changes['display_name'] = displayName.trim();
+        if (bio != null) changes['bio'] = bio.trim();
+        if (changes.isNotEmpty) {
+          await _db.from('profiles').update(changes).eq('id', me);
+        }
+        return fetchMyProfile();
+      });
+
+  @override
+  Future<String> uploadMyAvatar(File file) => _guard(() async {
+        final me = _me;
+        final ext = file.path.split('.').last.toLowerCase();
+        final safeExt = const {'jpg', 'jpeg', 'png', 'webp'}.contains(ext) ? ext : 'jpg';
+        final contentType = safeExt == 'png'
+            ? 'image/png'
+            : safeExt == 'webp'
+                ? 'image/webp'
+                : 'image/jpeg';
+        // A new file name each time, so the app never shows an old photo from cache.
+        final path = '$me/avatar_${DateTime.now().millisecondsSinceEpoch}.$safeExt';
+        final bucket = _db.storage.from('avatars');
+        await bucket.upload(path, file, fileOptions: FileOptions(contentType: contentType, upsert: true));
+        final url = bucket.getPublicUrl(path);
+        await _db.from('profiles').update({'avatar_url': url}).eq('id', me);
+        return url;
       });
 
   @override
