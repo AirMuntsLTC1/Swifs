@@ -6,13 +6,13 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// One live connection for the signed-in user.
 ///
-/// - Every change to a watched table is announced on [changes] with the table name,
-///   so screens can refresh themselves.
-/// - New follows, likes, comments, and similar activity show as phone notifications.
-/// - New direct messages show as phone notifications (sender name and text).
+/// - Every change to a watched table is announced on [changes] so screens can refresh themselves.
+/// - New messages show as "New Message" with the sender's circle photo.
+/// - Follows, follow requests, accepted requests, likes, comments and reactions show as
+///   "New Follower", "Follow Request", "Request Accepted", and so on, with the person's circle photo.
 ///
-/// Started and stopped by the auth listener in main.dart, so it also works after a login
-/// made while the app is open.
+/// Started and stopped by the auth listener in main.dart, so it also works after a login made
+/// while the app is open.
 class RealtimeHub {
   static final RealtimeHub instance = RealtimeHub._();
   RealtimeHub._();
@@ -56,7 +56,7 @@ class RealtimeHub {
       );
     }
 
-    // Activity notifications (follow, like, comment, reaction, reply).
+    // Activity: follows, requests, accepted requests, likes, comments, reactions, replies.
     channel.onPostgresChanges(
       event: PostgresChangeEvent.insert,
       schema: 'public',
@@ -65,7 +65,7 @@ class RealtimeHub {
       callback: (payload) {
         _changes.add('notifications');
         final record = payload.newRecord;
-        // Messages get their own notification below, so skip any message-type row to avoid two.
+        // Messages are announced from the messages table below, so skip message rows here.
         if (record['type'] == 'message') return;
         _showActivity(record);
       },
@@ -113,34 +113,41 @@ class RealtimeHub {
   // Phone notifications
   // ------------------------------------------------------------------
 
-  /// Follow, like, comment, reaction, reply and similar activity.
+  /// Follows, requests, accepted requests, likes, comments, saves, reactions and replies.
   Future<void> _showActivity(Map<String, dynamic> record) async {
     final type = (record['type'] ?? '').toString();
-    final actor = _nameOf(record['actor_name'], record['actor_handle']);
-    final action = switch (type) {
-      'follow' => 'started following you',
-      'follow_accept' => 'accepted your follow request',
-      'follow_request' => 'asked to follow you',
-      'like' => 'liked your post',
-      'comment' => 'commented on your post',
-      'save' => 'saved your post',
-      'story_reaction' || 'reaction' => 'reacted to your story ${_emojiOf(record)}',
-      'story_reply' => 'replied to your story',
-      _ => 'sent you a notification',
+    final who = _displayName(record['actor_name'], record['actor_handle']);
+    final preview = (record['preview'] ?? '').toString().trim();
+    final emoji = (record['emoji'] ?? '').toString().trim();
+
+    final (title, body) = switch (type) {
+      'follow' => ('New Follower', '$who started following you'),
+      'follow_request' => ('Follow Request', '$who wants to follow you'),
+      'follow_accept' => ('Request Accepted', '$who accepted your follow request'),
+      'like' => ('New Like', '$who liked your post'),
+      'comment' => ('New Comment', preview.isEmpty ? '$who commented on your post' : '$who: $preview'),
+      'save' => ('Post Saved', '$who saved your post'),
+      'story_reaction' || 'reaction' => (
+          'Story Reaction',
+          emoji.isEmpty ? '$who reacted to your story' : '$who reacted $emoji to your story',
+        ),
+      'story_reply' => ('Story Reply', preview.isEmpty ? '$who replied to your story' : '$who: $preview'),
+      _ => ('New Activity', '$who sent you a notification'),
     };
-    await _post(
-      title: actor,
-      body: action,
-      avatarUrl: record['avatar_url']?.toString(),
-    );
+
+    var avatar = record['avatar_url']?.toString();
+    if (avatar == null || avatar.isEmpty) {
+      avatar = await _avatarByHandle(record['actor_handle']?.toString());
+    }
+    await _post(title: title, body: body, avatarUrl: avatar);
   }
 
-  /// A new direct message. Shows the sender's name and the message text.
+  /// A new direct message: title "New Message", the sender's circle photo, and "Name: text".
   Future<void> _showMessage(Map<String, dynamic> record) async {
     final senderId = record['sender']?.toString();
     if (senderId == null || senderId == _userId) return;
 
-    var name = 'New message';
+    var name = 'Someone';
     String? avatar;
     try {
       final row = await Supabase.instance.client
@@ -149,7 +156,7 @@ class RealtimeHub {
           .eq('id', senderId)
           .maybeSingle();
       if (row != null) {
-        name = _nameOf(row['display_name'], row['username']);
+        name = _displayName(row['display_name'], row['username']);
         avatar = row['avatar_url']?.toString();
       }
     } catch (e) {
@@ -157,22 +164,32 @@ class RealtimeHub {
     }
 
     final text = (record['text'] ?? '').toString().trim();
-    final body = text.isNotEmpty
+    final detail = text.isNotEmpty
         ? text
         : (record['shared_post_id'] != null ? 'Shared a post with you' : 'Sent you a message');
-    await _post(title: name, body: body, avatarUrl: avatar);
+    await _post(title: 'New Message', body: '$name: $detail', avatarUrl: avatar);
   }
 
-  String _nameOf(Object? name, Object? handle) {
+  /// The profile photo for a username, used when the notification row has none.
+  Future<String?> _avatarByHandle(String? handle) async {
+    if (handle == null || handle.isEmpty) return null;
+    try {
+      final row = await Supabase.instance.client
+          .from('profiles')
+          .select('avatar_url')
+          .eq('username', handle)
+          .maybeSingle();
+      return row?['avatar_url']?.toString();
+    } catch (_) {
+      return null;
+    }
+  }
+
+  String _displayName(Object? name, Object? handle) {
     final n = (name ?? '').toString().trim();
     if (n.isNotEmpty) return n;
     final h = (handle ?? '').toString().trim();
     return h.isNotEmpty ? '@$h' : 'Someone';
-  }
-
-  String _emojiOf(Map<String, dynamic> record) {
-    final e = (record['emoji'] ?? '').toString();
-    return e;
   }
 
   /// Sends one notification to the native side. Errors are logged, not hidden.
