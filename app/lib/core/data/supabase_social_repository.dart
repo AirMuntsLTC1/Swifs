@@ -444,6 +444,60 @@ class SupabaseSocialRepository implements SocialRepository {
       });
 
   // ------------------------------------------------------------------
+  // Notifications
+  // ------------------------------------------------------------------
+
+  @override
+  Future<List<NotificationModel>> fetchNotifications() => _guard(() async {
+        final me = _me;
+        final rows = await _db
+            .from('notifications')
+            .select('id, type, actor_handle, actor_name, created_at')
+            .eq('user_id', me)
+            .order('created_at', ascending: false)
+            .limit(50);
+            
+        final list = rows.map((e) => Map<String, dynamic>.from(e)).toList();
+        if (list.isEmpty) return <NotificationModel>[];
+        
+        final actorHandles = list.map((r) => r['actor_handle'].toString()).toSet().toList();
+        final profiles = await _db.from('profiles').select('id, username, avatar_url').inFilter('username', actorHandles);
+        final profileMap = {for (final p in profiles) p['username'].toString(): p};
+        
+        final followRows = await _db.from('follows').select('followee').eq('follower', me);
+        final following = {for (final r in followRows) r['followee'].toString()};
+
+        return list.map((r) {
+          final handle = r['actor_handle'].toString();
+          final prof = profileMap[handle] ?? <String, dynamic>{};
+          final actorId = (prof['id'] ?? '').toString();
+          return NotificationModel(
+            id: r['id'].toString(),
+            type: r['type'].toString(),
+            actorId: actorId,
+            actorUsername: handle,
+            actorAvatarUrl: prof['avatar_url']?.toString(),
+            timeAgo: formatAge(_ageMinutes(r['created_at'])),
+            isFollowing: following.contains(actorId),
+          );
+        }).toList();
+      });
+
+  @override
+  Future<void> blockUser(String userId) => _guard(() async {
+        final me = _me;
+        await _db.from('blocked_users').insert({'blocker': me, 'blocked': userId});
+        await _db.from('follows').delete().eq('follower', me).eq('followee', userId);
+        await _db.from('follows').delete().eq('follower', userId).eq('followee', me);
+      });
+
+  @override
+  Future<void> restrictUser(String userId) => _guard(() async {
+        final me = _me;
+        await _db.from('restricted_users').insert({'restrictor': me, 'restricted': userId});
+      });
+
+  // ------------------------------------------------------------------
   // Outbox
   // ------------------------------------------------------------------
 

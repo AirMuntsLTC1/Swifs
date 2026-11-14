@@ -38,4 +38,9 @@ abstract class SocialRepository {
 
   /// Runs one action from the outbox.
   Future<dynamic> run(OutboxOp op);
+
+  Future<List<NotificationModel>> fetchNotifications();
+  Future<void> blockUser(String userId);
+  Future<void> restrictUser(String userId);
+
 }

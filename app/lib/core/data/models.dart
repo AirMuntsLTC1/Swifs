@@ -211,3 +211,23 @@ List<CommentModel> buildCommentTree(List<CommentModel> flat) {
 }
 
 
+
+class NotificationModel {
+  final String id;
+  final String type;
+  final String actorId;
+  final String actorUsername;
+  final String? actorAvatarUrl;
+  final String timeAgo;
+  bool isFollowing;
+
+  NotificationModel({
+    required this.id,
+    required this.type,
+    required this.actorId,
+    required this.actorUsername,
+    this.actorAvatarUrl,
+    required this.timeAgo,
+    this.isFollowing = false,
+  });
+}
