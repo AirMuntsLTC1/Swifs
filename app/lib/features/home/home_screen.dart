@@ -101,7 +101,7 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const Text('Swifs', style: TextStyle(fontSize: 26, fontWeight: FontWeight.w800, color: kPrimary)),
+            const Text('Swifs', style: TextStyle(fontSize: 26, fontWeight: FontWeight.w400, color: kPrimary)),
             Row(children: [
               IconButton(icon: const SwifsIcon(LucideIcons.search), onPressed: () {}),
               IconButton(icon: const SwifsIcon(LucideIcons.bell), onPressed: () {}),
@@ -130,7 +130,7 @@ class _HomeScreenState extends State<HomeScreen> {
               child: const CircleAvatar(backgroundColor: Colors.grey),
             ),
             const SizedBox(height: 4),
-            Text(stories[i], style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w500)),
+            Text(stories[i], style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w400)),
           ]),
         ),
       ),
@@ -154,8 +154,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('@${p['user']}', style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 14)),
-                        Text(p['time'], style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                        Text('@${p['user']}', style: const TextStyle(fontWeight: FontWeight.w400, fontSize: 14)),
+                        Text(p['time'], style: const TextStyle(fontSize: 12, color: Color(0xFF65676B))),
                       ],
                     ),
                     const Spacer(),
@@ -173,7 +173,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           style: TextStyle(
                             color: p['isFollowing'] ? Colors.black : Colors.white,
                             fontSize: 12,
-                            fontWeight: FontWeight.w500,
+                            fontWeight: FontWeight.w400,
                           ),
                         ),
                       ),
@@ -182,8 +182,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
               Container(
-                height: 350, color: Colors.grey.shade200,
-                child: const Center(child: SwifsIcon(LucideIcons.image, size: 48, color: Colors.grey)),
+                height: 350, color: Color(0xFF65676B).shade200,
+                child: const Center(child: SwifsIcon(LucideIcons.image, size: 48, color: Color(0xFF65676B))),
               ),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
@@ -226,10 +226,10 @@ class _HomeScreenState extends State<HomeScreen> {
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 12),
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text('${p['likes']} likes', style: const TextStyle(fontWeight: FontWeight.w500)),
+                  Text('${p['likes']} likes', style: const TextStyle(fontWeight: FontWeight.w400)),
                   const SizedBox(height: 4),
                   Text.rich(TextSpan(children: [
-                    TextSpan(text: '@${p['user']} ', style: const TextStyle(fontWeight: FontWeight.w500)),
+                    TextSpan(text: '@${p['user']} ', style: const TextStyle(fontWeight: FontWeight.w400)),
                     TextSpan(text: p['caption']),
                   ])),
                 ]),

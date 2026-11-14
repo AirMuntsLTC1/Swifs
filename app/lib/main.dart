@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter/material.dart' show NoSplash;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/theme/swifs_icon.dart';
@@ -29,6 +30,14 @@ class SwifsApp extends StatelessWidget {
         splashFactory: NoSplash.splashFactory,
         highlightColor: Colors.transparent,
         splashColor: Colors.transparent,
+        // Clean Typography like Facebook
+        textTheme: GoogleFonts.interTextTheme(Theme.of(context).textTheme).apply(
+          bodyColor: const Color(0xFF1C1E21), // Off-black text
+          displayColor: const Color(0xFF1C1E21),
+        ),
+        iconTheme: const IconThemeData(
+          color: Color(0xFF1C1E21),
+        ),
       ),
       home: const MainShell(),
     );
