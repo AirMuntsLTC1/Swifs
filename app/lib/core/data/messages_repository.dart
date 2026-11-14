@@ -96,7 +96,7 @@ class MessagesRepository {
   DirectMessage _fromRow(Map<String, dynamic> r) => DirectMessage(
         id: r['id'].toString(),
         senderId: r['sender'].toString(),
-        recipientId: r['recipient'].toString(),
+        recipientId: (r['recipient'] ?? '').toString(),
         text: (r['text'] ?? '').toString(),
         createdAt: DateTime.tryParse(r['created_at'].toString())?.toLocal() ?? DateTime.now(),
         readAt: r['read_at'] == null ? null : DateTime.tryParse(r['read_at'].toString()),
@@ -137,6 +137,8 @@ class MessagesRepository {
     final byOther = <String, Conversation>{};
     for (final r in rows) {
       final m = _fromRow(Map<String, dynamic>.from(r));
+      // group messages are skipped here: they have no recipient. (group messages are skipped)
+      if (m.groupId != null) continue;
       final other = m.senderId == me ? m.recipientId : m.senderId;
       final conv = byOther.putIfAbsent(other, () => Conversation(otherId: other, last: m));
       if (m.recipientId == me && m.readAt == null) conv.unread++;

@@ -697,10 +697,7 @@ class SupabaseSocialRepository implements SocialRepository {
 
   @override
   Future<void> blockUser(String userId) => _guard(() async {
-        final me = _me;
-        await _db.from('blocked_users').insert({'blocker': me, 'blocked': userId});
-        await _db.from('follows').delete().eq('follower', me).eq('followee', userId);
-        await _db.from('follows').delete().eq('follower', userId).eq('followee', me);
+        await _db.rpc('block_user', params: {'p_target': userId});
       });
 
   @override
