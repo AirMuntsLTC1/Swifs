@@ -65,9 +65,9 @@ class NotificationManager(private val context: Context) {
             }
 
             val intent = context.packageManager.getLaunchIntentForPackage(context.packageName)
-            val pendingIntent = PendingIntent.getActivity(
+            val pendingIntent = if (intent != null) PendingIntent.getActivity(
                 context, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-            )
+            ) else null
 
             val builder = NotificationCompat.Builder(context, channelId)
                 .setSmallIcon(android.R.drawable.ic_dialog_info) // Replace with your app icon
@@ -75,7 +75,8 @@ class NotificationManager(private val context: Context) {
                 .setContentText(body)
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
                 .setAutoCancel(true)
-                .setContentIntent(pendingIntent)
+
+            if (pendingIntent != null) builder.setContentIntent(pendingIntent)
 
             if (bitmap != null) {
                 try {
