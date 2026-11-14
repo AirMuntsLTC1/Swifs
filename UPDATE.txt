@@ -1,0 +1,19 @@
+SWIFS UPDATE - icons + splash (no white box, no Flutter logo)
+
+Install (Termux):
+  pkg install unzip -y
+  cd ~/swifs            # your project folder (the one with app/ and .github/)
+  unzip -o ~/swifs-update.zip
+  git add -A
+  git commit -m "Update icons and native splash"
+  git push
+
+Then uninstall the old Swifs app before installing the new APK.
+
+Files changed:
+  app/pubspec.yaml                  adds flutter_native_splash, adaptive icon
+  .github/workflows/build.yml       draws icons and generates splash
+  scripts/make_icons.py             draws the plane logo in code
+  app/assets/icon.png               full orange rounded icon (legacy)
+  app/assets/icon_foreground.png    plane for Android adaptive icon
+  app/assets/splash_plane.png       plane for native splash (no box)

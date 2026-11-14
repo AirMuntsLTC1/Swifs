@@ -83,9 +83,18 @@ jobs:
         working-directory: app
         run: flutter pub get
 
+      - name: Draw Swifs icons in code
+        run: |
+          sudo apt-get update && sudo apt-get install -y python3-pil
+          python3 scripts/make_icons.py
+
       - name: Generate App Icons
         working-directory: app
         run: dart run flutter_launcher_icons
+
+      - name: Generate Splash Screen
+        working-directory: app
+        run: dart run flutter_native_splash:create
 
       - name: Build arm64-only Release APK
         working-directory: app
