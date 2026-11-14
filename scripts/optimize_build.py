@@ -1,4 +1,5 @@
 import pathlib
+import re
 
 p = pathlib.Path('android/app/build.gradle')
 if not p.exists():
@@ -6,6 +7,12 @@ if not p.exists():
     exit(0)
 
 s = p.read_text()
+
+# 1. Force compileSdk to 35 to support audioplayers
+s = re.sub(r'compileSdk\s*=\s*\d+', 'compileSdk = 35', s)
+s = re.sub(r'compileSdkVersion\s*\d+', 'compileSdkVersion 35', s)
+
+# 2. Apply size optimizations (packagingOptions)
 block = '''    packagingOptions {
         jniLibs {
             useLegacyPackaging true
@@ -24,7 +31,6 @@ block = '''    packagingOptions {
 
 if 'packagingOptions' not in s:
     s = s.replace('android {', 'android {\n' + block, 1)
-    p.write_text(s)
-    print('packagingOptions injected ✓')
-else:
-    print('packagingOptions already present')
+
+p.write_text(s)
+print('✅ build.gradle optimized: compileSdk set to 35 and packagingOptions applied')
