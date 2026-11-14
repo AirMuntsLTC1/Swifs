@@ -1,7 +1,9 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../core/theme/swifs_icon.dart';
 import 'package:lucide_icons_flutter_plus/lucide_icons_flutter_plus.dart';
 import '../../core/data/social.dart';
+import '../../core/widgets/user_avatar.dart';
 
 const Color kPrimary = Color(0xFFFF6B35);
 
@@ -13,26 +15,64 @@ class SearchScreen extends StatefulWidget {
 
 class _SearchScreenState extends State<SearchScreen> {
   List<Map<String, dynamic>> _users = [];
-  bool _isLoading = true;
+  bool _loading = true;
+  String? _error;
   final TextEditingController _searchController = TextEditingController();
+  Timer? _debounce;
+  int _requestId = 0;
 
   @override
   void initState() {
     super.initState();
-    _fetchUsers('');
+    _fetch('');
   }
 
-  Future<void> _fetchUsers(String query) async {
+  /// Waits a moment after typing, then asks the server. Old answers that arrive late are ignored.
+  void _onChanged(String value) {
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 250), () => _fetch(value));
+  }
+
+  Future<void> _fetch(String query) async {
+    final id = ++_requestId;
+    if (mounted) setState(() => _loading = true);
     try {
-      final users = await social.searchUsers(query);
-      if (mounted) setState(() { _users = users; _isLoading = false; });
-    } catch (_) {
-      if (mounted) setState(() => _isLoading = false);
+      final users = query.trim().isEmpty
+          ? await social.suggestedUsers()
+          : await social.searchUsers(query);
+      if (!mounted || id != _requestId) return;
+      setState(() {
+        _users = users;
+        _loading = false;
+        _error = null;
+      });
+    } catch (e) {
+      if (!mounted || id != _requestId) return;
+      setState(() {
+        _loading = false;
+        _error = e.toString();
+      });
+    }
+  }
+
+  Future<void> _toggleFollow(int index) async {
+    final user = _users[index];
+    final id = user['id'].toString();
+    final was = user['isFollowing'] == true;
+    setState(() => user['isFollowing'] = !was);
+    try {
+      final result = await social.setFollow(id, !was);
+      if (mounted) setState(() => user['isFollowing'] = result);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => user['isFollowing'] = was);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
     }
   }
 
   @override
   void dispose() {
+    _debounce?.cancel();
     _searchController.dispose();
     super.dispose();
   }
@@ -57,7 +97,7 @@ class _SearchScreenState extends State<SearchScreen> {
           child: TextField(
             controller: _searchController,
             autofocus: true,
-            onChanged: (v) => _fetchUsers(v),
+            onChanged: _onChanged,
             style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w400),
             decoration: InputDecoration(
               hintText: 'Search Swifs...',
@@ -73,61 +113,87 @@ class _SearchScreenState extends State<SearchScreen> {
           ),
         ),
       ),
-      body: ListView.separated(
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        itemCount: _users.length,
-        separatorBuilder: (_, __) => const Divider(height: 1, indent: 76),
-        itemBuilder: (_, i) {
-          final user = _users[i];
-          return Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                const CircleAvatar(
-                  radius: 28,
-                  backgroundColor: Color(0xFFE4E6EB),
-                  child: SwifsIcon(LucideIcons.user, size: 28, color: Colors.grey),
+      body: _body(),
+    );
+  }
+
+  Widget _body() {
+    if (_loading && _users.isEmpty) {
+      return const Center(child: CircularProgressIndicator(color: kPrimary));
+    }
+    if (_error != null && _users.isEmpty) {
+      return Center(child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Text("Couldn't search right now. Check your connection.", textAlign: TextAlign.center, style: const TextStyle(color: Colors.grey)),
+      ));
+    }
+    if (_users.isEmpty) {
+      return Center(
+        child: Text(
+          _searchController.text.trim().isEmpty ? 'No suggestions yet' : 'No people found',
+          style: const TextStyle(color: Colors.grey),
+        ),
+      );
+    }
+    return ListView.separated(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      itemCount: _users.length,
+      separatorBuilder: (_, __) => const Divider(height: 1, indent: 76),
+      itemBuilder: (_, i) {
+        final user = _users[i];
+        final display = (user['display_name'] ?? '').toString().trim();
+        final username = (user['username'] ?? '').toString();
+        final following = user['isFollowing'] == true;
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          child: Row(
+            children: [
+              UserAvatar(
+                url: user['avatar_url']?.toString(),
+                name: display.isNotEmpty ? display : username,
+                radius: 28,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      display.isNotEmpty ? display : username,
+                      style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                    ),
+                    Text('@$username', style: const TextStyle(color: Colors.grey, fontSize: 13)),
+                    const SizedBox(height: 4),
+                    Text(
+                      '${user['followers_count'] ?? 0} followers · ${user['following_count'] ?? 0} following',
+                      style: const TextStyle(color: Colors.grey, fontSize: 12),
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(user['display_name'] ?? user['username'], style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
-                      Text('@${user['username']}', style: const TextStyle(color: Colors.grey, fontSize: 13)),
-                      const SizedBox(height: 4),
-                      Text(
-                        '${user['followers_count'] ?? 0} followers · ${user['following_count'] ?? 0} following',
-                        style: const TextStyle(color: Colors.grey, fontSize: 12),
-                      ),
-                    ],
+              ),
+              GestureDetector(
+                onTap: () => _toggleFollow(i),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 150),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: following ? const Color(0xFFE4E6EB) : kPrimary,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    following ? 'Following' : 'Follow',
+                    style: TextStyle(
+                      color: following ? Colors.black : Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
                 ),
-                GestureDetector(
-                  onTap: () => setState(() => user['isFollowing'] = !user['isFollowing']),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 150),
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: user['isFollowing'] ? const Color(0xFFE4E6EB) : kPrimary,
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Text(
-                      user['isFollowing'] ? 'Following' : 'Follow',
-                      style: TextStyle(
-                        color: user['isFollowing'] ? Colors.black : Colors.white,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          );
-        },
-      ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }

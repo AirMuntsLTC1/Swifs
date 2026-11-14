@@ -50,3 +50,5 @@ $router->post('/api/follow', function () {
     $input = json_decode(file_get_contents('php://input'), true);
     echo json_encode(['status' => 'success', 'action' => 'follow', 'username' => $input['username'] ?? null]);
 });
+
+

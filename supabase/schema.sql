@@ -322,3 +322,5 @@ revoke execute on function public.set_save(uuid, boolean) from anon;
 revoke execute on function public.set_follow(text, boolean) from anon;
 revoke execute on function public.add_comment(uuid, text, uuid) from anon;
 revoke execute on function public.set_comment_like(uuid, boolean) from anon;
+
+

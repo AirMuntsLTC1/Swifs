@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/auth/auth_service.dart';
 import '../../core/cache/local_cache.dart';
+import '../../core/data/settings_repository.dart';
 import 'package:lucide_icons_flutter_plus/lucide_icons_flutter_plus.dart';
 import '../../core/theme/swifs_icon.dart';
 
@@ -8,6 +9,8 @@ const Color kPrimary = Color(0xFFFF6B35);
 const Color kInk = Color(0xFF111111);
 const Color kMuted = Color(0xFF8E8E93);
 const Color kLine = Color(0xFFEFEFEF);
+
+const List<String> _audience = ['Everyone', 'Followers', 'Off'];
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -17,34 +20,58 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  // Who can see your content
-  String _accountPrivacy = 'Public';
-  final int _closeFriends = 0;
-  bool _friendsFeedActivity = true;
+  UserSettings _s = UserSettings.defaults();
+  int _blocked = 0;
 
-  // How others can interact with you
-  String _messages = 'Everyone';
-  String _tags = 'Everyone';
-  String _comments = 'Everyone';
-  bool _sharingReuse = true;
-  String _limitInteractions = 'Off';
-  bool _hiddenWords = true;
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
 
-  // What you see / notifications
-  bool _pushNotifications = true;
-  bool _likeNotifications = true;
-  bool _commentNotifications = true;
-  bool _followNotifications = true;
+  /// Shows the saved copy from the phone right away, then refreshes from Supabase.
+  Future<void> _load() async {
+    final cached = await SettingsRepository.instance.cachedSettings();
+    if (cached != null && mounted) setState(() => _s = cached);
 
-  static const _audience = ['Everyone', 'Followers', 'Off'];
+    final fresh = await SettingsRepository.instance.loadSettings();
+    final blocked = await _blockedCountSafe();
+    if (!mounted) return;
+    setState(() {
+      _s = fresh;
+      _blocked = blocked;
+    });
+  }
 
-  Future<void> _pick({
+  Future<int> _blockedCountSafe() async {
+    try {
+      return await SettingsRepository.instance.blockedCount();
+    } catch (_) {
+      return 0;
+    }
+  }
+
+  /// Applies the change on screen immediately, then saves it to Supabase.
+  Future<void> _update(UserSettings next) async {
+    setState(() => _s = next);
+    try {
+      await SettingsRepository.instance.saveSettings(next);
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Saved on this phone, but couldn't reach the server. Try again later."),
+        ),
+      );
+    }
+  }
+
+  Future<String?> _pick({
     required String title,
     required List<String> options,
     required String current,
-    required ValueChanged<String> onPick,
-  }) async {
-    final choice = await showModalBottomSheet<String>(
+  }) {
+    return showModalBottomSheet<String>(
       context: context,
       backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(
@@ -87,9 +114,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
       ),
     );
-    if (choice != null && mounted) {
-      setState(() => onPick(choice));
-    }
   }
 
   void _openPage(String title, String emptyText, IconData icon) {
@@ -99,6 +123,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
         builder: (_) => _EmptyPage(title: title, text: emptyText, icon: icon),
       ),
     );
+  }
+
+  Future<void> _openBlocked() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const _BlockedPage()),
+    );
+    final count = await _blockedCountSafe();
+    if (mounted) setState(() => _blocked = count);
   }
 
   Future<void> _confirmLogout() async {
@@ -153,21 +186,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
         padding: const EdgeInsets.only(bottom: 32),
         children: [
           _section('Who can see your content', [
-            _row(
+            _choiceRow(
               icon: LucideIcons.lock,
               label: 'Account privacy',
-              value: _accountPrivacy,
-              onTap: () => _pick(
-                title: 'Account privacy',
-                options: const ['Public', 'Private'],
-                current: _accountPrivacy,
-                onPick: (v) => _accountPrivacy = v,
-              ),
+              value: _s.accountPrivacy,
+              title: 'Account privacy',
+              options: const ['Public', 'Private'],
+              onPicked: (v) => _update(_s.copyWith(accountPrivacy: v)),
             ),
             _row(
               icon: LucideIcons.star,
               label: 'Close Friends',
-              value: '$_closeFriends',
               onTap: () => _openPage(
                 'Close Friends',
                 'People you add here can see your close friends stories.',
@@ -186,12 +215,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
             _row(
               icon: LucideIcons.ban,
               label: 'Blocked',
-              value: '0',
-              onTap: () => _openPage(
-                'Blocked',
-                'Accounts you block will show up here.',
-                LucideIcons.ban,
-              ),
+              value: '$_blocked',
+              onTap: _openBlocked,
             ),
             _row(
               icon: LucideIcons.clock,
@@ -206,78 +231,65 @@ class _SettingsScreenState extends State<SettingsScreen> {
               icon: LucideIcons.users,
               label: 'Activity in Friends feed',
               subtitle: 'Let friends see what you like and follow',
-              value: _friendsFeedActivity,
-              onChanged: (v) => setState(() => _friendsFeedActivity = v),
+              value: _s.friendsFeedActivity,
+              onChanged: (v) => _update(_s.copyWith(friendsFeedActivity: v)),
             ),
           ]),
           _section('How others can interact with you', [
-            _row(
+            _choiceRow(
               icon: LucideIcons.send,
               label: 'Messages and story replies',
-              value: _messages,
-              onTap: () => _pick(
-                title: 'Messages and story replies',
-                options: _audience,
-                current: _messages,
-                onPick: (v) => _messages = v,
-              ),
+              value: _s.messagesAudience,
+              title: 'Messages and story replies',
+              options: _audience,
+              onPicked: (v) => _update(_s.copyWith(messagesAudience: v)),
             ),
-            _row(
+            _choiceRow(
               icon: LucideIcons.atSign,
               label: 'Tags and mentions',
-              value: _tags,
-              onTap: () => _pick(
-                title: 'Tags and mentions',
-                options: _audience,
-                current: _tags,
-                onPick: (v) => _tags = v,
-              ),
+              value: _s.tagsAudience,
+              title: 'Tags and mentions',
+              options: _audience,
+              onPicked: (v) => _update(_s.copyWith(tagsAudience: v)),
             ),
-            _row(
+            _choiceRow(
               icon: LucideIcons.messageCircle,
               label: 'Comments',
-              value: _comments,
-              onTap: () => _pick(
-                title: 'Comments',
-                options: _audience,
-                current: _comments,
-                onPick: (v) => _comments = v,
-              ),
+              value: _s.commentsAudience,
+              title: 'Comments',
+              options: _audience,
+              onPicked: (v) => _update(_s.copyWith(commentsAudience: v)),
             ),
             _switchRow(
               icon: LucideIcons.share2,
               label: 'Sharing and reuse',
               subtitle: 'Allow others to share your posts',
-              value: _sharingReuse,
-              onChanged: (v) => setState(() => _sharingReuse = v),
+              value: _s.sharingReuse,
+              onChanged: (v) => _update(_s.copyWith(sharingReuse: v)),
             ),
             _row(
               icon: LucideIcons.eyeOff,
               label: 'Restricted',
-              value: '0',
               onTap: () => _openPage(
                 'Restricted',
                 'Restricted accounts can see your posts but cannot message you.',
                 LucideIcons.eyeOff,
               ),
             ),
-            _row(
+            _choiceRow(
               icon: LucideIcons.shield,
               label: 'Limit interactions',
-              value: _limitInteractions,
-              onTap: () => _pick(
-                title: 'Limit interactions',
-                options: const ['Off', 'On'],
-                current: _limitInteractions,
-                onPick: (v) => _limitInteractions = v,
-              ),
+              value: _s.limitInteractions,
+              title: 'Limit interactions',
+              options: const ['Off', 'On'],
+              onPicked: (v) => _update(_s.copyWith(limitInteractions: v)),
             ),
             _switchRow(
               icon: LucideIcons.type,
               label: 'Hidden Words',
               subtitle: 'Hide comments and messages with words you choose',
-              value: _hiddenWords,
-              onChanged: (v) => setState(() => _hiddenWords = v),
+              value: _s.hiddenWords,
+              onChanged: (v) => _update(_s.copyWith(hiddenWords: v)),
             ),
             _row(
               icon: LucideIcons.userPlus,
@@ -293,26 +305,26 @@ class _SettingsScreenState extends State<SettingsScreen> {
             _switchRow(
               icon: LucideIcons.bell,
               label: 'Push notifications',
-              value: _pushNotifications,
-              onChanged: (v) => setState(() => _pushNotifications = v),
+              value: _s.pushNotifications,
+              onChanged: (v) => _update(_s.copyWith(pushNotifications: v)),
             ),
             _switchRow(
               icon: LucideIcons.heart,
               label: 'Likes',
-              value: _likeNotifications,
-              onChanged: (v) => setState(() => _likeNotifications = v),
+              value: _s.likeNotifications,
+              onChanged: (v) => _update(_s.copyWith(likeNotifications: v)),
             ),
             _switchRow(
               icon: LucideIcons.messageCircle,
               label: 'Comments',
-              value: _commentNotifications,
-              onChanged: (v) => setState(() => _commentNotifications = v),
+              value: _s.commentNotifications,
+              onChanged: (v) => _update(_s.copyWith(commentNotifications: v)),
             ),
             _switchRow(
               icon: LucideIcons.userPlus,
               label: 'New followers',
-              value: _followNotifications,
-              onChanged: (v) => setState(() => _followNotifications = v),
+              value: _s.followNotifications,
+              onChanged: (v) => _update(_s.copyWith(followNotifications: v)),
             ),
           ]),
           Padding(
@@ -358,6 +370,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
         ...rows,
       ],
+    );
+  }
+
+  Widget _choiceRow({
+    required IconData icon,
+    required String label,
+    required String value,
+    required String title,
+    required List<String> options,
+    required ValueChanged<String> onPicked,
+  }) {
+    return _row(
+      icon: icon,
+      label: label,
+      value: value,
+      onTap: () async {
+        final choice = await _pick(title: title, options: options, current: value);
+        if (choice != null && choice != value && mounted) onPicked(choice);
+      },
     );
   }
 
@@ -447,6 +478,152 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 }
 
+/// Lists the accounts you blocked, with an Unblock button for each.
+class _BlockedPage extends StatefulWidget {
+  const _BlockedPage();
+
+  @override
+  State<_BlockedPage> createState() => _BlockedPageState();
+}
+
+class _BlockedPageState extends State<_BlockedPage> {
+  List<Map<String, dynamic>> _people = [];
+  bool _loading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final people = await SettingsRepository.instance.loadBlocked();
+      if (!mounted) return;
+      setState(() {
+        _people = people;
+        _loading = false;
+        _error = null;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = "Couldn't load blocked accounts.";
+      });
+    }
+  }
+
+  Future<void> _unblock(String id) async {
+    try {
+      await SettingsRepository.instance.unblock(id);
+      if (!mounted) return;
+      setState(() => _people.removeWhere((p) => p['id'].toString() == id));
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Couldn't unblock. Try again.")),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    Widget body;
+    if (_loading) {
+      body = const Center(child: CircularProgressIndicator(color: kPrimary));
+    } else if (_error != null) {
+      body = Center(child: Text(_error!, style: const TextStyle(color: kMuted)));
+    } else if (_people.isEmpty) {
+      body = const _EmptyBody(
+        icon: LucideIcons.ban,
+        text: 'Accounts you block will show up here.',
+      );
+    } else {
+      body = ListView.builder(
+        itemCount: _people.length,
+        itemBuilder: (_, i) {
+          final p = _people[i];
+          final id = p['id'].toString();
+          final name = ((p['display_name'] as String?) ?? '').trim();
+          final handle = (p['username'] as String?) ?? '';
+          final avatar = p['avatar_url'] as String?;
+          final label = name.isNotEmpty ? name : handle;
+          final initial = label.isEmpty ? '?' : label[0].toUpperCase();
+          final hasAvatar = avatar != null && avatar.isNotEmpty;
+          return ListTile(
+            leading: CircleAvatar(
+              backgroundColor: kLine,
+              backgroundImage: hasAvatar ? NetworkImage(avatar) : null,
+              child: hasAvatar
+                  ? null
+                  : Text(
+                      initial,
+                      style: const TextStyle(color: kInk, fontWeight: FontWeight.w700),
+                    ),
+            ),
+            title: Text(label, style: const TextStyle(color: kInk)),
+            subtitle: handle.isNotEmpty
+                ? Text('@$handle', style: const TextStyle(color: kMuted))
+                : null,
+            trailing: OutlinedButton(
+              onPressed: () => _unblock(id),
+              child: const Text('Unblock'),
+            ),
+          );
+        },
+      );
+    }
+
+    return Scaffold(
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.white,
+        elevation: 0,
+        leading: IconButton(
+          icon: const SwifsIcon(LucideIcons.arrowLeft, color: kInk),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: const Text(
+          'Blocked',
+          style: TextStyle(color: kInk, fontSize: 18, fontWeight: FontWeight.w700),
+        ),
+      ),
+      body: body,
+    );
+  }
+}
+
+class _EmptyBody extends StatelessWidget {
+  final IconData icon;
+  final String text;
+
+  const _EmptyBody({required this.icon, required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SwifsIcon(icon, size: 48, color: kMuted),
+            const SizedBox(height: 16),
+            Text(
+              text,
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 15, color: kMuted, height: 1.4),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _EmptyPage extends StatelessWidget {
   final String title;
   final String text;
@@ -475,23 +652,7 @@ class _EmptyPage extends StatelessWidget {
           ),
         ),
       ),
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(32),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              SwifsIcon(icon, size: 48, color: kMuted),
-              const SizedBox(height: 16),
-              Text(
-                text,
-                textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 15, color: kMuted, height: 1.4),
-              ),
-            ],
-          ),
-        ),
-      ),
+      body: _EmptyBody(icon: icon, text: text),
     );
   }
 }

@@ -7,3 +7,4 @@ return [
     'following' => 0,
     'posts' => 0,
 ];
+

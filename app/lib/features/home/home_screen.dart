@@ -10,6 +10,12 @@ import '../../core/theme/swifs_icon.dart';
 import 'package:lucide_icons_flutter_plus/lucide_icons_flutter_plus.dart';
 import '../../core/data/models.dart';
 import '../../core/data/social.dart';
+import '../../core/widgets/post_media.dart';
+import '../../core/widgets/user_avatar.dart';
+import '../../core/widgets/story_ring.dart';
+import '../../core/data/stories_repository.dart';
+import '../stories/story_camera_screen.dart';
+import '../stories/story_viewer_screen.dart';
 import '../../core/network/interaction_queue.dart';
 import '../comments/comments_sheet.dart';
 import '../create/create_post_screen.dart';
@@ -27,6 +33,29 @@ class _HomeScreenState extends State<HomeScreen> {
   late List<Map<String, dynamic>> _posts;
   final AudioPlayer _audioPlayer = AudioPlayer();
   final RefreshController _refreshController = RefreshController(initialRefresh: false);
+  bool _loading = true;
+  List<StoryGroup> _groups = [];
+  String? _myAvatar;
+  String _myName = 'You';
+
+  StoryGroup? get _mine {
+    for (final g in _groups) {
+      if (g.isMine) return g;
+    }
+    return null;
+  }
+
+  void _onStoryUploadChanged() {
+    if (StoriesRepository.uploadProgress.value == null) _loadStories();
+  }
+
+  void _onStoryError() {
+    final e = StoriesRepository.uploadError.value;
+    if (e != null && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e)));
+      StoriesRepository.uploadError.value = null;
+    }
+  }
 
   @override
   void initState() {
@@ -34,22 +63,25 @@ class _HomeScreenState extends State<HomeScreen> {
     _posts = [];
 
     // Preload audio for low latency
-    _audioPlayer.setPlayerMode(PlayerMode.lowLatency);
-    _audioPlayer.setSource(AssetSource('sounds/bubble_pop.mp3'));
     _loadFeed();
+    _loadStories();
+    StoriesRepository.uploadProgress.addListener(_onStoryUploadChanged);
+    StoriesRepository.uploadError.addListener(_onStoryError);
   }
 
   @override
   void dispose() {
+    StoriesRepository.uploadProgress.removeListener(_onStoryUploadChanged);
+    StoriesRepository.uploadError.removeListener(_onStoryError);
     _audioPlayer.dispose();
     _refreshController.dispose();
     super.dispose();
   }
 
-  void _playPopSound() async {
+  Future<void> _playPopSound() async {
     try {
       final player = AudioPlayer();
-      player.play(AssetSource('sounds/bubble_pop.mp3'));
+      await player.play(AssetSource('sounds/bubble_pop.mp3')).catchError((_) {});
       player.onPlayerComplete.listen((_) => player.dispose());
     } catch (e) {
       print('Audio error: $e');
@@ -104,6 +136,8 @@ class _HomeScreenState extends State<HomeScreen> {
       if (mounted) setState(() => _posts = _sorted(fresh.map((p) => p.toMap()).toList()));
     } catch (_) {
       // Offline: keep the saved posts on screen.
+    } finally {
+      if (mounted) setState(() => _loading = false);
     }
   }
 
@@ -202,7 +236,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 controller: _refreshController,
                 onRefresh: () async {
-                  await Future.delayed(const Duration(seconds: 1));
+                  await _loadStories();
+                  await _loadFeed();
                   _refreshController.refreshCompleted();
                 },
                 child: _feed(),
@@ -245,34 +280,140 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       );
 
-  Widget _storiesRow() {
-    final stories = ['Your Story', 'alex', 'mia', 'leo', 'zara'];
-    return SizedBox(
-      height: 100,
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.only(left: 12),
-        itemCount: stories.length,
-        itemBuilder: (_, i) => Padding(
-          padding: const EdgeInsets.only(right: 16),
-          child: Column(children: [
-            Container(
-              width: 68, height: 68,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(color: i == 0 ? Colors.grey.shade300 : kPrimary, width: 2.5),
-              ),
-              child: const CircleAvatar(backgroundColor: Colors.grey),
-            ),
+  /// Loads the story rail and my profile photo for the first ring.
+  Future<void> _loadStories() async {
+    try {
+      final groups = await StoriesRepository.instance.fetchRail();
+      Map<String, dynamic>? me;
+      try {
+        me = await social.fetchMyProfile();
+      } catch (_) {
+        me = await social.cachedMyProfile();
+      }
+      if (!mounted) return;
+      setState(() {
+        _groups = groups;
+        _myAvatar = me?['avatar_url']?.toString();
+        final name = (me?['display_name'] ?? '').toString().trim();
+        final handle = (me?['username'] ?? '').toString().trim();
+        _myName = name.isNotEmpty ? name : (handle.isNotEmpty ? handle : 'You');
+      });
+    } catch (_) {
+      // Offline: keep the rail that is already on screen.
+    }
+  }
+
+  void _openCamera() {
+    Navigator.push(context, MaterialPageRoute(builder: (_) => const StoryCameraScreen()))
+        .then((_) => _loadStories());
+  }
+
+  void _openViewer(int groupIndex) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => StoryViewerScreen(groups: _groups, startGroup: groupIndex)),
+    ).then((_) => _loadStories());
+  }
+
+  Widget _storyColumn({required Widget avatar, required String label, required VoidCallback onTap}) {
+    return GestureDetector(
+      onTap: onTap,
+      child: SizedBox(
+        width: 74,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            avatar,
             const SizedBox(height: 4),
-            Text(stories[i], style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w500)),
-          ]),
+            Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w500),
+            ),
+          ],
         ),
       ),
     );
   }
 
-  Widget _feed() => ListView.builder(
+  Widget _myStoryItem(double? uploading) {
+    final mine = _mine;
+    final hasStory = mine != null;
+    final avatar = SizedBox(
+      width: 68,
+      height: 68,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          StoryRing(
+            size: 68,
+            seen: mine == null || mine.allSeen,
+            uploadProgress: uploading,
+            child: UserAvatar(url: _myAvatar, name: _myName, radius: 30),
+          ),
+          if (uploading == null)
+            Positioned(
+              right: -2,
+              bottom: -2,
+              child: GestureDetector(
+                onTap: _openCamera,
+                child: Container(
+                  width: 22,
+                  height: 22,
+                  decoration: BoxDecoration(
+                    color: kStoryBlue,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.white, width: 2),
+                  ),
+                  child: const Icon(Icons.add, color: Colors.white, size: 14),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+    final label = uploading != null ? 'Sharing…' : 'Your story';
+    final onTap = (mine != null && uploading == null)
+        ? () => _openViewer(_groups.indexOf(mine))
+        : _openCamera;
+    return _storyColumn(avatar: avatar, label: label, onTap: onTap);
+  }
+
+  Widget _storiesRow() {
+    return SizedBox(
+      height: 100,
+      child: ValueListenableBuilder<double?>(
+        valueListenable: StoriesRepository.uploadProgress,
+        builder: (context, uploading, _) {
+          final others = _groups.where((g) => !g.isMine).toList();
+          return ListView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.only(left: 12, top: 4),
+            children: [
+              Padding(padding: const EdgeInsets.only(right: 12), child: _myStoryItem(uploading)),
+              for (final g in others)
+                Padding(
+                  padding: const EdgeInsets.only(right: 12),
+                  child: _storyColumn(
+                    avatar: StoryRing(
+                      size: 68,
+                      seen: g.allSeen,
+                      child: UserAvatar(url: g.avatarUrl, name: g.label, radius: 30),
+                    ),
+                    label: g.label,
+                    onTap: () => _openViewer(_groups.indexOf(g)),
+                  ),
+                ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _feed() => _posts.isEmpty ? _emptyFeed() : ListView.builder(
         itemCount: _posts.length,
         itemBuilder: (_, i) {
           final p = _posts[i];
@@ -284,7 +425,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    const CircleAvatar(radius: 18, backgroundColor: Colors.grey),
+                    UserAvatar(url: p['avatarUrl']?.toString(), name: (p['displayName'] ?? p['user']).toString(), radius: 18),
                     const SizedBox(width: 8),
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -532,114 +673,20 @@ class _FloatingHeartsState extends State<_FloatingHearts> with SingleTickerProvi
   }
 }
 
-
-class PostMedia extends StatefulWidget {
-  final String url;
-  final String? thumbUrl;
-  final String type;
-
-  const PostMedia({super.key, required this.url, this.thumbUrl, required this.type});
-
-  @override
-  State<PostMedia> createState() => _PostMediaState();
-}
-
-class _PostMediaState extends State<PostMedia> {
-  VideoPlayerController? _controller;
-  bool _isPlaying = false;
-  bool _isMuted = true;
-
-  @override
-  void initState() {
-    super.initState();
-    if (widget.type == 'video') {
-      _controller = VideoPlayerController.networkUrl(Uri.parse(widget.url))
-        ..initialize().then((_) {
-          _controller!.setVolume(0); // Default muted
-          _controller!.setLooping(true);
-          setState(() {});
-        });
-    }
-  }
-
-  @override
-  void dispose() {
-    _controller?.dispose();
-    super.dispose();
-  }
-
-  void _togglePlay() {
-    if (_controller == null) return;
-    setState(() {
-      if (_controller!.value.isPlaying) {
-        _controller!.pause();
-      } else {
-        _controller!.play();
-      }
-    });
-  }
-
-  void _toggleMute() {
-    if (_controller == null) return;
-    setState(() {
-      _isMuted = !_isMuted;
-      _controller!.setVolume(_isMuted ? 0 : 1);
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (widget.type == 'video' && _controller != null && _controller!.value.isInitialized) {
-      return AspectRatio(
-        aspectRatio: 4 / 5, // Instagram style aspect ratio
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            VideoPlayer(_controller!),
-            GestureDetector(
-              onTap: _togglePlay,
-              child: Container(
-                color: Colors.transparent,
-                child: Center(
-                  child: AnimatedOpacity(
-                    opacity: _controller!.value.isPlaying ? 0.0 : 1.0,
-                    duration: const Duration(milliseconds: 200),
-                    child: const Icon(Icons.play_arrow, size: 64, color: Colors.white),
-                  ),
-                ),
-              ),
-            ),
-            Positioned(
-              bottom: 12,
-              right: 12,
-              child: GestureDetector(
-                onTap: _toggleMute,
-                child: Container(
-                  padding: const EdgeInsets.all(6),
-                  decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(20)),
-                  child: Icon(_isMuted ? Icons.volume_off : Icons.volume_up, color: Colors.white, size: 20),
-                ),
-              ),
-            ),
-          ],
+extension _EmptyFeedBuilder on _HomeScreenState {
+  Widget _emptyFeed() {
+    return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      children: [
+        SizedBox(
+          height: 320,
+          child: Center(
+            child: _loading
+                ? const CircularProgressIndicator(color: kPrimary)
+                : const Text('No posts yet. Be the first to post.', style: TextStyle(color: Colors.grey)),
+          ),
         ),
-      );
-    }
-
-    return AspectRatio(
-      aspectRatio: 4 / 5,
-      child: CachedNetworkImage(
-        imageUrl: widget.thumbUrl ?? widget.url,
-        fit: BoxFit.cover,
-        placeholder: (context, url) => Container(
-          color: const Color(0xFFF0F2F5),
-          child: const Center(child: CircularProgressIndicator(color: Color(0xFFFF6B35))),
-        ),
-        errorWidget: (context, url, error) => Container(
-          color: const Color(0xFFF0F2F5),
-          child: const Center(child: SwifsIcon(LucideIcons.image, size: 48, color: Colors.grey)),
-        ),
-      ),
+      ],
     );
   }
 }

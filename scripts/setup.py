@@ -99,3 +99,5 @@ if __name__ == '__main__':
     ok = check_schema() and ok
     count_loc()
     sys.exit(0 if ok else 1)
+
+

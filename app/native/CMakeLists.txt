@@ -6,3 +6,5 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 add_library(swifs_core SHARED src/swifs_core.cpp)
 target_include_directories(swifs_core PRIVATE include)
+
+

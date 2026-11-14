@@ -7,3 +7,5 @@ if url and key:
     print("✅ Supabase config injected successfully.")
 else:
     print("⚠️ Secrets missing. Using placeholder config.")
+
+

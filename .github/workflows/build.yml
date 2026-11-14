@@ -108,3 +108,5 @@ jobs:
         with:
           name: swifs-arm64-release
           path: app/build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
+
+

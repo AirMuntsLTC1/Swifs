@@ -24,3 +24,5 @@ int swifs_hash_user(const char *username) {
 }
 
 const char *swifs_core_version(void) { return "0.1.0"; }
+
+

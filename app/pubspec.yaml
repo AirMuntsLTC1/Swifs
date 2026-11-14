@@ -20,6 +20,9 @@ dependencies:
   ffi: ^2.1.2
   supabase_flutter: ^2.8.4
   shared_preferences: ^2.3.3
+  video_thumbnail: ^0.5.3
+  visibility_detector: ^0.4.0
+  photo_manager: ^3.6.1
 dev_dependencies:
   flutter_launcher_icons: ^0.13.1
   flutter_native_splash: ^2.4.1
@@ -32,9 +35,6 @@ dev_dependencies:
   flutter_lints: ^3.0.0
 flutter:
   uses-material-design: true
-
-  assets:
-    - assets/sounds/
 
 flutter_launcher_icons:
   android: "ic_launcher"
@@ -55,3 +55,5 @@ flutter_native_splash:
 
 dependency_overrides:
   app_links: 6.3.2
+
+

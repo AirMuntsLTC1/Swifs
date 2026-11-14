@@ -4,6 +4,10 @@ import '../../core/theme/swifs_refresh.dart';
 import '../../core/theme/swifs_icon.dart';
 import 'package:lucide_icons_flutter_plus/lucide_icons_flutter_plus.dart';
 import 'settings_screen.dart';
+import '../../core/data/models.dart';
+import '../../core/data/social.dart';
+import '../../core/widgets/post_media.dart';
+import '../../core/widgets/user_avatar.dart';
 
 const Color kPrimary = Color(0xFFFF6B35);
 
@@ -15,6 +19,53 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen> {
   final RefreshController _refreshController = RefreshController(initialRefresh: false);
+  Map<String, dynamic> _profile = {};
+  List<FeedPost> _posts = [];
+  List<FeedPost> _saved = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCachedProfile();
+    _load();
+  }
+
+  Future<void> _loadCachedProfile() async {
+    final cached = await social.cachedMyProfile();
+    if (cached != null && mounted) setState(() => _profile = cached);
+  }
+
+  /// Loads the signed-in user's profile, posts, and saved posts from Supabase.
+  Future<void> _load() async {
+    try {
+      final results = await Future.wait([
+        social.fetchMyProfile(),
+        social.fetchMyPosts(),
+        social.fetchSavedPosts(),
+      ]);
+      if (!mounted) return;
+      setState(() {
+        _profile = results[0] as Map<String, dynamic>;
+        _posts = results[1] as List<FeedPost>;
+        _saved = results[2] as List<FeedPost>;
+      });
+    } catch (_) {
+      // Offline: keep whatever is already on screen.
+    }
+  }
+
+  String get _displayName {
+    final name = (_profile['display_name'] ?? '').toString().trim();
+    if (name.isNotEmpty) return name;
+    final handle = (_profile['username'] ?? '').toString().trim();
+    return handle.isNotEmpty ? handle : 'Your name';
+  }
+
+  List<FeedPost> _tabPosts(int idx) {
+    if (idx == 0) return _posts;
+    if (idx == 1) return _posts.where((p) => p.mediaType == 'video').toList();
+    return _saved;
+  }
 
   @override
   void dispose() {
@@ -35,7 +86,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ),
         controller: _refreshController,
         onRefresh: () async {
-          await Future.delayed(const Duration(seconds: 1));
+          await _load();
           _refreshController.refreshCompleted();
         },
         child: DefaultTabController(
@@ -50,33 +101,33 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     children: [
                       Row(
                         children: [
-                          const CircleAvatar(
+                          UserAvatar(
+                            url: _profile['avatar_url']?.toString(),
+                            name: _displayName,
                             radius: 42,
-                            backgroundColor: Color(0xFFE4E6EB),
-                            child: SwifsIcon(LucideIcons.user, size: 42, color: Colors.grey),
                           ),
                           const SizedBox(width: 20),
                           Expanded(
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.spaceAround,
-                              children: const [
-                                _Stat('0', 'Posts'),
-                                _Stat('0', 'Followers'),
-                                _Stat('0', 'Following'),
+                              children: [
+                                _Stat('${_posts.length}', 'Posts'),
+                                _Stat('${_profile['followers_count'] ?? 0}', 'Followers'),
+                                _Stat('${_profile['following_count'] ?? 0}', 'Following'),
                               ],
                             ),
                           ),
                         ],
                       ),
                       const SizedBox(height: 16),
-                      const Align(
+                      Align(
                         alignment: Alignment.centerLeft,
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text('Your Name', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
+                            Text(_displayName, style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
                             SizedBox(height: 4),
-                            Text('Building Swifs 🚀', style: TextStyle(color: Colors.grey, fontSize: 14)),
+                            Text('@${_profile['username'] ?? ''}', style: TextStyle(color: Colors.grey, fontSize: 14)),
                           ],
                         ),
                       ),
@@ -153,10 +204,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     mainAxisSpacing: 2,
                     crossAxisSpacing: 2,
                   ),
-                  itemCount: 12,
-                  itemBuilder: (_, i) => Container(
-                    color: const Color(0xFFF0F2F5),
-                    child: const Center(child: SwifsIcon(LucideIcons.image, color: Colors.grey)),
+                  itemCount: _tabPosts(idx).length,
+                  itemBuilder: (_, i) => PostGridTile(
+                    post: _tabPosts(idx)[i],
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => PostViewerScreen(post: _tabPosts(idx)[i])),
+                    ),
                   ),
                 );
               }),
@@ -183,3 +237,4 @@ class _Stat extends StatelessWidget {
     );
   }
 }
+

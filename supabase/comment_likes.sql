@@ -21,3 +21,5 @@ create policy "comment likes insert own" on public.comment_likes
 drop policy if exists "comment likes delete own" on public.comment_likes;
 create policy "comment likes delete own" on public.comment_likes
   for delete to authenticated using (user_id = auth.uid());
+
+

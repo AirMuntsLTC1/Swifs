@@ -34,3 +34,5 @@ if 'packagingOptions' not in s:
 
 p.write_text(s)
 print('✅ build.gradle optimized: compileSdk set to 35 and packagingOptions applied')
+
+

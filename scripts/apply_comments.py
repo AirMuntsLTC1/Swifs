@@ -25,3 +25,5 @@ src = pattern.sub(r"\1() => showCommentsSheet(context, postId: p['id']),", src)
 
 path.write_text(src, encoding='utf-8')
 print('Comment button now opens the comments sheet.')
+
+

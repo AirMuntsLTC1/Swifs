@@ -3,6 +3,7 @@ import '../../core/data/models.dart';
 import '../../core/data/social.dart';
 import '../../core/network/interaction_queue.dart';
 import '../../core/widgets/pop_heart.dart';
+import '../../core/widgets/user_avatar.dart';
 
 const Color kPrimary = Color(0xFFFF6B35);
 const Color kInk = Color(0xFF111111);
@@ -330,13 +331,10 @@ class _CommentsSheetState extends State<CommentsSheet> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          CircleAvatar(
+          UserAvatar(
+            url: c.avatarUrl,
+            name: c.user,
             radius: isReply ? 11 : 14,
-            backgroundColor: kLine,
-            child: Text(
-              c.user[0].toUpperCase(),
-              style: TextStyle(fontSize: isReply ? 10 : 12, fontWeight: FontWeight.w600, color: kMuted),
-            ),
           ),
           const SizedBox(width: 10),
           Expanded(
@@ -467,3 +465,5 @@ class _CommentsSheetState extends State<CommentsSheet> {
     );
   }
 }
+
+

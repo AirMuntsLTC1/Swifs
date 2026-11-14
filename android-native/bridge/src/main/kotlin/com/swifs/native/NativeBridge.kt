@@ -23,3 +23,5 @@ class NativeBridge(private val context: Context) {
         }
     }
 }
+
+

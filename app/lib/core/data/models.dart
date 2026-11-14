@@ -133,6 +133,7 @@ class CommentModel {
   final String? parentId;
   final String authorId;
   final String user;
+  final String? avatarUrl;
   final String text;
   String time;
   int ageMinutes;
@@ -146,6 +147,7 @@ class CommentModel {
     this.parentId,
     this.authorId = '',
     required this.user,
+    this.avatarUrl,
     required this.text,
     required this.time,
     this.ageMinutes = 0,
@@ -166,6 +168,7 @@ class CommentModel {
         'parent_id': parentId,
         'author_id': authorId,
         'user': user,
+        'avatar_url': avatarUrl,
         'text': text,
         'age_minutes': ageMinutes,
         'likes': likes,
@@ -179,6 +182,7 @@ class CommentModel {
       parentId: m['parent_id']?.toString(),
       authorId: (m['author_id'] ?? '').toString(),
       user: (m['user'] ?? 'user').toString(),
+      avatarUrl: m['avatar_url']?.toString(),
       text: (m['text'] ?? '').toString(),
       time: formatAge(age),
       ageMinutes: age,
@@ -205,3 +209,5 @@ List<CommentModel> buildCommentTree(List<CommentModel> flat) {
   }
   return tops;
 }
+
+

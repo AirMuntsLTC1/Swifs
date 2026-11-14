@@ -10,3 +10,4 @@ class RankingService {
         return (int)($engagement / ($ageMinutes + 1));
     }
 }
+

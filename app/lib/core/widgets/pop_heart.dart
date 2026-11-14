@@ -7,7 +7,7 @@ import '../theme/swifs_icon.dart';
 void playPopSound() {
   try {
     final player = AudioPlayer();
-    player.play(AssetSource('sounds/bubble_pop.mp3'));
+    player.play(AssetSource('sounds/bubble_pop.mp3')).catchError((_) {});
     player.onPlayerComplete.listen((_) => player.dispose());
   } catch (_) {}
 }
@@ -147,3 +147,5 @@ class _FloatingHeartsState extends State<_FloatingHearts>
     );
   }
 }
+
+

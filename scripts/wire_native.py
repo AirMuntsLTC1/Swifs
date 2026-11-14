@@ -63,3 +63,5 @@ def patch_manifest() -> None:
 if __name__ == '__main__':
     patch_gradle()
     patch_manifest()
+
+
