@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:audioplayers/audioplayers.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import '../../core/theme/swifs_icon.dart';
@@ -17,10 +18,13 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   late List<Map<String, dynamic>> _posts;
+  final AudioPlayer _audioPlayer = AudioPlayer();
 
   @override
   void initState() {
     super.initState();
+    _audioPlayer.setPlayerMode(PlayerMode.lowLatency);
+    _audioPlayer.setSource(AssetSource('sounds/bubble_pop.mp3'));
     _posts = mockPosts.map((p) => {
       ...p, 
       'isFollowing': false,
@@ -28,9 +32,19 @@ class _HomeScreenState extends State<HomeScreen> {
     }).toList();
   }
 
+  void _playPopSound() async {
+    try {
+      await _audioPlayer.stop();
+      await _audioPlayer.resume();
+    } catch (e) {
+      print('Audio error: $e');
+    }
+  }
+
   void _handleLike(int index) {
     final p = _posts[index];
     final newLikedState = !p['liked'];
+    if (newLikedState) _playPopSound();
     final newLikesCount = newLikedState ? p['likes'] + 1 : p['likes'] - 1;
 
     // Try-catch prevents crash if C++ isn't compiled in Gradle yet
@@ -52,6 +66,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _handleSave(int index) {
     final p = _posts[index];
+    if (!p['isSaved']) _playPopSound();
     setState(() => p['isSaved'] = !p['isSaved']);
     _sendToApi('/save', {'post_id': p['id']});
   }
@@ -81,6 +96,12 @@ class _HomeScreenState extends State<HomeScreen> {
     } catch (e) {
       print('PHP API Error: $e');
     }
+  }
+
+  @override
+  void dispose() {
+    _audioPlayer.dispose();
+    super.dispose();
   }
 
   @override
@@ -310,6 +331,12 @@ class _AnimatedActionIconState extends State<_AnimatedActionIcon> {
   }
 
   @override
+  void dispose() {
+    _audioPlayer.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: _handleTap,
@@ -358,6 +385,12 @@ class _FloatingHeartsState extends State<_FloatingHearts> with SingleTickerProvi
   @override
   void dispose() {
     _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  void dispose() {
+    _audioPlayer.dispose();
     super.dispose();
   }
 
