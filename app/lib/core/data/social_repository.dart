@@ -12,6 +12,7 @@ abstract class SocialRepository {
   Future<List<String>> fetchTrendingTags();
   Future<List<Map<String, dynamic>>> fetchTrendingWithUses();
   Future<List<FeedPost>> fetchExplorePosts();
+  Future<List<Map<String, dynamic>>> fetchPostMedia(String postId);
   Future<List<FeedPost>> fetchHashtagPosts(String tag);
 
   // Profile

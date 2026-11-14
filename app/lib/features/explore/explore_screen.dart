@@ -8,6 +8,7 @@ import '../../core/data/social.dart';
 import '../../core/widgets/post_media.dart';
 import 'hashtag_screen.dart';
 import 'search_screen.dart';
+import 'saved_posts_screen.dart';
 
 const Color kPrimary = Color(0xFFFF6B35);
 const Color kHashtagBlue = Color(0xFF1877F2);
@@ -100,23 +101,54 @@ class _ExploreScreenState extends State<ExploreScreen> {
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                child: GestureDetector(
-                  onTap: _openSearch,
-                  child: Container(
-                    height: 44,
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade100,
-                      borderRadius: BorderRadius.circular(14),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: _openSearch,
+                        child: Container(
+                          height: 44,
+                          decoration: BoxDecoration(
+                            color: Colors.grey.shade100,
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: Row(
+                            children: [
+                              const SizedBox(width: 14),
+                              const SwifsIcon(LucideIcons.search, size: 18, color: Colors.grey),
+                              const SizedBox(width: 10),
+                              const Text('Search Swifs', style: TextStyle(color: Colors.grey, fontSize: 15)),
+                            ],
+                          ),
+                        ),
+                      ),
                     ),
-                    child: Row(
-                      children: [
-                        const SizedBox(width: 14),
-                        const SwifsIcon(LucideIcons.search, size: 18, color: Colors.grey),
-                        const SizedBox(width: 10),
-                        const Text('Search Swifs', style: TextStyle(color: Colors.grey, fontSize: 15)),
-                      ],
+                    const SizedBox(width: 12),
+                    GestureDetector(
+                      onTap: () => Navigator.push(
+                        context,
+                        PageRouteBuilder(
+                          pageBuilder: (_, __, ___) => const SavedPostsScreen(),
+                          transitionsBuilder: (_, animation, __, child) {
+                            return SlideTransition(
+                              position: Tween<Offset>(begin: const Offset(0, 1), end: Offset.zero)
+                                  .animate(CurvedAnimation(parent: animation, curve: Curves.easeOutCubic)),
+                              child: child,
+                            );
+                          },
+                        ),
+                      ),
+                      child: Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade100,
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: const Center(child: SwifsIcon(LucideIcons.bookmark, size: 20, color: Colors.black)),
+                      ),
                     ),
-                  ),
+                  ],
                 ),
               ),
             ),

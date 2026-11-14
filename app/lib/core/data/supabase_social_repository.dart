@@ -129,7 +129,7 @@ class SupabaseSocialRepository implements SocialRepository {
   Future<List<FeedPost>> fetchExplorePosts() => _guard(() async {
         final rows = await _db
             .from('posts')
-            .select('id, author_id, text, likes, created_at, post_media(kind, storage_path, thumb_path, position)')
+            .select('id, author_id, text, likes, views, created_at, post_media(kind, storage_path, thumb_path, position)')
             .order('likes', ascending: false)
             .limit(60);
         final posts = rows.map((e) => Map<String, dynamic>.from(e)).toList();
@@ -145,7 +145,7 @@ class SupabaseSocialRepository implements SocialRepository {
         if (clean.isEmpty) return <FeedPost>[];
         final rows = await _db
             .from('posts')
-            .select('id, author_id, text, likes, created_at, post_media(kind, storage_path, thumb_path, position)')
+            .select('id, author_id, text, likes, views, created_at, post_media(kind, storage_path, thumb_path, position)')
             .ilike('text', '%#$clean%')
             .order('created_at', ascending: false)
             .limit(60);
@@ -155,6 +155,29 @@ class SupabaseSocialRepository implements SocialRepository {
             .where((p) => (p['text'] ?? '').toString().toLowerCase().contains(lower))
             .toList();
         return _hydrate(posts);
+      });
+
+  // ------------------------------------------------------------------
+  // Post Media (for carousel)
+  // ------------------------------------------------------------------
+
+  @override
+  Future<List<Map<String, dynamic>>> fetchPostMedia(String postId) => _guard(() async {
+        final rows = await _db
+            .from('post_media')
+            .select('kind, storage_path, thumb_path, position')
+            .eq('post_id', postId)
+            .order('position', ascending: true);
+            
+        return rows.map((r) {
+          final path = r['storage_path']?.toString();
+          final thumb = r['thumb_path']?.toString();
+          return {
+            'type': r['kind']?.toString() ?? 'image',
+            'url': path != null ? _publicMediaUrl(path) : null,
+            'thumbUrl': thumb != null ? _publicMediaUrl(thumb) : null,
+          };
+        }).where((m) => m['url'] != null).toList();
       });
 
   // ------------------------------------------------------------------
@@ -187,7 +210,7 @@ class SupabaseSocialRepository implements SocialRepository {
         final me = _me;
         final rows = await _db
             .from('posts')
-            .select('id, author_id, text, likes, created_at, post_media(kind, storage_path, thumb_path, position)')
+            .select('id, author_id, text, likes, views, created_at, post_media(kind, storage_path, thumb_path, position)')
             .eq('author_id', me)
             .order('created_at', ascending: false)
             .limit(60);
@@ -202,7 +225,7 @@ class SupabaseSocialRepository implements SocialRepository {
         if (ids.isEmpty) return <FeedPost>[];
         final rows = await _db
             .from('posts')
-            .select('id, author_id, text, likes, created_at, post_media(kind, storage_path, thumb_path, position)')
+            .select('id, author_id, text, likes, views, created_at, post_media(kind, storage_path, thumb_path, position)')
             .inFilter('id', ids);
         final byId = {for (final r in rows) r['id'].toString(): Map<String, dynamic>.from(r)};
         // Keep the order the user saved them in.
@@ -225,7 +248,7 @@ class SupabaseSocialRepository implements SocialRepository {
   Future<List<FeedPost>> fetchFeed() => _guard(() async {
         final rows = await _db
             .from('posts')
-            .select('id, author_id, text, likes, created_at, post_media(kind, storage_path, thumb_path, position)')
+            .select('id, author_id, text, likes, views, created_at, post_media(kind, storage_path, thumb_path, position)')
             .order('created_at', ascending: false)
             .limit(50);
         final list = await _hydrate(rows.map((e) => Map<String, dynamic>.from(e)).toList());
@@ -286,7 +309,7 @@ class SupabaseSocialRepository implements SocialRepository {
         mediaUrl: mediaUrl,
         mediaType: mediaType,
         thumbUrl: thumbUrl,
-        views: 0,
+        views: (p['views'] as num?)?.toInt() ?? 0,
         ageMinutes: _ageMinutes(p['created_at']),
         likes: (p['likes'] as num?)?.toInt() ?? 0,
         comments: commentCounts[pid] ?? 0,
@@ -527,7 +550,7 @@ class SupabaseSocialRepository implements SocialRepository {
   Future<List<FeedPost>> fetchUserPosts(String userId) => _guard(() async {
         final rows = await _db
             .from('posts')
-            .select('id, author_id, text, likes, created_at, post_media(kind, storage_path, thumb_path, position)')
+            .select('id, author_id, text, likes, views, created_at, post_media(kind, storage_path, thumb_path, position)')
             .eq('author_id', userId)
             .order('created_at', ascending: false)
             .limit(60);
