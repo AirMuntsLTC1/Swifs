@@ -1,16 +1,40 @@
 import 'package:flutter/material.dart';
+import 'package:pull_to_refresh_flutter3/pull_to_refresh_flutter3.dart';
+import '../../core/theme/swifs_refresh.dart';
 import '../../core/theme/swifs_icon.dart';
 import 'package:lucide_icons_flutter_plus/lucide_icons_flutter_plus.dart';
 
 const Color kPrimary = Color(0xFFFF6B35);
 
-class ProfileScreen extends StatelessWidget {
+class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
+  @override
+  State<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends State<ProfileScreen> {
+  final RefreshController _refreshController = RefreshController(initialRefresh: false);
+
+  @override
+  void dispose() {
+    _refreshController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     return SafeArea(
-      child: DefaultTabController(
+      child: SmartRefresher(
+        enablePullDown: true,
+        header: CustomHeader(
+          builder: (context, mode) => buildSwifsRefreshIcon(LucideIcons.user),
+        ),
+        controller: _refreshController,
+        onRefresh: () async {
+          await Future.delayed(const Duration(seconds: 1));
+          _refreshController.refreshCompleted();
+        },
+        child: DefaultTabController(
         length: 3,
         child: NestedScrollView(
           headerSliverBuilder: (_, __) => [
@@ -110,6 +134,7 @@ class ProfileScreen extends StatelessWidget {
             }),
           ),
         ),
+      ),
       ),
     );
   }

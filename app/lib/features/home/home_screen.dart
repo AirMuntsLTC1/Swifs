@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:pull_to_refresh_flutter3/pull_to_refresh_flutter3.dart';
+import '../../core/theme/swifs_refresh.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:audioplayers/audioplayers.dart';
@@ -19,6 +21,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   late List<Map<String, dynamic>> _posts;
   final AudioPlayer _audioPlayer = AudioPlayer();
+  final RefreshController _refreshController = RefreshController(initialRefresh: false);
 
   @override
   void initState() {
@@ -37,13 +40,13 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void dispose() {
     _audioPlayer.dispose();
+    _refreshController.dispose();
     super.dispose();
   }
 
   void _playPopSound() async {
     try {
-      await _audioPlayer.stop();
-      await _audioPlayer.resume();
+      await _audioPlayer.play(AssetSource('sounds/bubble_pop.mp3'));
     } catch (e) {
       print('Audio error: $e');
     }
@@ -113,7 +116,20 @@ class _HomeScreenState extends State<HomeScreen> {
           children: [
             _topBar(),
             _storiesRow(),
-            Expanded(child: _feed()),
+            Expanded(
+              child: SmartRefresher(
+                enablePullDown: true,
+                header: CustomHeader(
+                  builder: (context, mode) => buildSwifsRefreshIcon(LucideIcons.house),
+                ),
+                controller: _refreshController,
+                onRefresh: () async {
+                  await Future.delayed(const Duration(seconds: 1));
+                  _refreshController.refreshCompleted();
+                },
+                child: _feed(),
+              ),
+            ),
           ],
         ),
       ),
