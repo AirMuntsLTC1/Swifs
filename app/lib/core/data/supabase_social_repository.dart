@@ -682,7 +682,8 @@ class SupabaseSocialRepository implements SocialRepository {
   }
 
   @override
-  Future<void> createPost(String caption, List<String> filePaths) => _guard(() async {
+  @override
+  Future<void> createPost(String caption, List<Map<String, dynamic>> media) => _guard(() async {
         final me = _me;
         final postId = const Uuid().v4();
 
@@ -695,16 +696,18 @@ class SupabaseSocialRepository implements SocialRepository {
         });
 
         final bucket = _db.storage.from('post-media');
-        for (int i = 0; i < filePaths.length; i++) {
-          final path = filePaths[i];
-          final ext = path.split('.').last.toLowerCase();
-          final isVideo = _videoExts.contains(ext);
+        for (int i = 0; i < media.length; i++) {
+          final item = media[i];
+          final path = item['path'] as String;
+          final kind = item['type'] as String;
+          final isVideo = kind == 'video';
+          final ext = isVideo ? 'mp4' : 'jpg';
           final storagePath = '$postId/$i.$ext';
 
           await bucket.upload(
             storagePath,
             File(path),
-            fileOptions: FileOptions(contentType: _mime(ext), upsert: true),
+            fileOptions: FileOptions(contentType: isVideo ? 'video/mp4' : 'image/jpeg', upsert: true),
           );
 
           String? thumbPath;
@@ -720,18 +723,18 @@ class SupabaseSocialRepository implements SocialRepository {
             thumbBytes = await _imageThumb(File(path));
           }
           if (thumbBytes != null) {
-            thumbPath = '$postId/$i-thumb.${isVideo ? 'jpg' : 'png'}';
+            thumbPath = '$postId/$i-thumb.jpg';
             await bucket.uploadBinary(
               thumbPath,
               thumbBytes,
-              fileOptions: FileOptions(contentType: isVideo ? 'image/jpeg' : 'image/png', upsert: true),
+              fileOptions: FileOptions(contentType: 'image/jpeg', upsert: true),
             );
           }
 
           await _db.from('post_media').insert({
             'post_id': postId,
             'position': i,
-            'kind': isVideo ? 'video' : 'image',
+            'kind': kind,
             'storage_path': storagePath,
             'thumb_path': thumbPath,
             'width': 0,
