@@ -39,12 +39,50 @@ def patch_gradle() -> None:
     print('gradle: C++ core will be built into the app')
 
 
+def patch_main_activity() -> None:
+    path = pathlib.Path('android/app/src/main/kotlin/com/swifs/swifs/MainActivity.kt')
+    if not path.exists(): return
+    
+    text = path.read_text(encoding='utf-8')
+    if 'NotificationManager' in text: return
+
+    text = text.replace(
+        'import io.flutter.embedding.android.FlutterActivity',
+        'import io.flutter.embedding.android.FlutterActivity\nimport io.flutter.embedding.engine.FlutterEngine\nimport io.flutter.plugin.common.MethodChannel\nimport com.swifs.native.NotificationManager'
+    )
+    text = text.replace(
+        'class MainActivity: FlutterActivity() {',
+        '''class MainActivity: FlutterActivity() {
+    private val CHANNEL = "com.swifs.native/notifications"
+
+    override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
+        super.configureFlutterEngine(flutterEngine)
+        val nativeManager = NotificationManager(this)
+        
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL).setMethodCallHandler { call, result ->
+            if (call.method == "showNotification") {
+                val id = call.argument<Int>("id") ?: 0
+                val title = call.argument<String>("title") ?: ""
+                val body = call.argument<String>("body") ?: ""
+                val avatarUrl = call.argument<String>("avatarUrl")
+                nativeManager.showNotification(id, title, body, avatarUrl)
+                result.success(true)
+            } else {
+                result.notImplemented()
+            }
+        }
+    }'''
+    )
+    path.write_text(text, encoding='utf-8')
+
+
 def patch_manifest() -> None:
     manifest = pathlib.Path('android/app/src/main/AndroidManifest.xml')
     text = manifest.read_text(encoding='utf-8')
 
     permissions = (
-        '<uses-permission android:name="android.permission.INTERNET" />\n'
+        '<uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />\n'
         '    <uses-permission android:name="android.permission.CAMERA" />\n'
         '    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />\n'
         '    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />\n'
@@ -68,3 +106,4 @@ def patch_manifest() -> None:
 if __name__ == '__main__':
     patch_gradle()
     patch_manifest()
+    patch_main_activity()

@@ -11,6 +11,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'core/config/supabase_config.dart';
 import 'core/auth/auth_gate.dart';
 import 'core/network/interaction_queue.dart';
+import 'core/notifications/realtime_notification_service.dart';
 
 const Color kPrimary = Color(0xFFFF6B35);
 
@@ -18,6 +19,7 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Supabase.initialize(url: kSupabaseUrl, anonKey: kSupabaseAnonKey);
   InteractionQueue.instance.restore();
+  RealtimeNotificationService.instance.startListening();
   runApp(const ProviderScope(child: SwifsApp()));
 }
 
