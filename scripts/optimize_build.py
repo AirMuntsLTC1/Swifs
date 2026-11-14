@@ -7,14 +7,18 @@ if not p.exists():
 
 s = p.read_text()
 block = '''    packagingOptions {
-        jniLibs { useLegacyPackaging = true }
-        resources { excludes += setOf(
-            'META-INF/*.kotlin_module', 'META-INF/*.version',
-            'META-INF/AL2.0', 'META-INF/LGPL2.1',
-            'META-INF/LICENSE*', 'META-INF/NOTICE*',
-            'META-INF/DEPENDENCIES', 'META-INF/proguard/*',
-            'META-INF/gradle/incremental.annotation.processors'
-        ) }
+        jniLibs {
+            useLegacyPackaging true
+        }
+        resources {
+            excludes += [
+                'META-INF/*.kotlin_module', 'META-INF/*.version',
+                'META-INF/AL2.0', 'META-INF/LGPL2.1',
+                'META-INF/LICENSE*', 'META-INF/NOTICE*',
+                'META-INF/DEPENDENCIES', 'META-INF/proguard/*',
+                'META-INF/gradle/incremental.annotation.processors'
+            ]
+        }
     }
 '''
 
