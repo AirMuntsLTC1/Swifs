@@ -9,8 +9,8 @@ if not p.exists():
 s = p.read_text()
 
 # 1. Force compileSdk to 35 to support audioplayers
-s = re.sub(r'compileSdk\s*=\s*\d+', 'compileSdk = 35', s)
-s = re.sub(r'compileSdkVersion\s*\d+', 'compileSdkVersion 35', s)
+s = re.sub(r'compileSdk\s*=\s*\d+', 'compileSdk = 35
+s = re.sub(r'compileSdkVersion 35
 
 # 2. Apply size optimizations (packagingOptions)
 block = '''    packagingOptions {

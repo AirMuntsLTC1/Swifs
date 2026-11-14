@@ -16,6 +16,8 @@ class ExploreScreen extends StatefulWidget {
 
 class _ExploreScreenState extends State<ExploreScreen> {
   final RefreshController _refreshController = RefreshController(initialRefresh: false);
+  List<String> _tags = [];
+  bool _isLoading = true;
 
   @override
   void initState() {
@@ -26,8 +28,15 @@ class _ExploreScreenState extends State<ExploreScreen> {
   Future<void> _fetchTags() async {
     try {
       final tags = await social.fetchTrendingTags();
-      if (mounted) setState(() => _tags = tags);
-    } catch (_) {}
+      if (mounted) {
+        setState(() {
+          _tags = tags;
+          _isLoading = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
   @override
@@ -49,7 +58,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
         ),
         controller: _refreshController,
         onRefresh: () async {
-          await Future.delayed(const Duration(seconds: 1));
+          await _fetchTags();
           _refreshController.refreshCompleted();
         },
         child: CustomScrollView(
