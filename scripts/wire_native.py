@@ -1,10 +1,5 @@
 #!/usr/bin/env python3
-"""Makes Gradle build the C++ core into the app, and allows the app to reach the local PHP server.
-
-Runs in CI from the app folder, after `flutter create` generates android/:
-    python3 ../scripts/wire_native.py
-Safe to run twice.
-"""
+"""Makes Gradle build the C++ core into the app, and adds Android permissions."""
 import pathlib
 import sys
 
@@ -47,28 +42,29 @@ def patch_gradle() -> None:
 def patch_manifest() -> None:
     manifest = pathlib.Path('android/app/src/main/AndroidManifest.xml')
     text = manifest.read_text(encoding='utf-8')
-    if 'android.permission.INTERNET' not in text:
-        text = text.replace(
-            '<application',
-            '<uses-permission android:name="android.permission.INTERNET" />
-    <uses-permission android:name="android.permission.CAMERA" />
-    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
-    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
-    <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
-    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
-    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />
-\n    <application',
-            1,
-        )
+
+    permissions = (
+        '<uses-permission android:name="android.permission.INTERNET" />\n'
+        '    <uses-permission android:name="android.permission.CAMERA" />\n'
+        '    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />\n'
+        '    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />\n'
+        '    <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />\n'
+        '    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />\n'
+        '    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />\n'
+        '    '
+    )
+
+    if 'READ_MEDIA_IMAGES' not in text:
+        # Add all permissions right before <application
+        text = text.replace('<application', permissions + '<application', 1)
+
     if 'usesCleartextTraffic' not in text:
-        # Lets the app talk to the local PHP server over http://127.0.0.1
         text = text.replace('<application', '<application\n        android:usesCleartextTraffic="true"', 1)
+
     manifest.write_text(text, encoding='utf-8')
-    print('manifest: internet permission and local http allowed')
+    print('manifest: permissions and local http allowed')
 
 
 if __name__ == '__main__':
     patch_gradle()
     patch_manifest()
-
-
