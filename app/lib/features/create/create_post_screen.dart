@@ -76,12 +76,17 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     // For Instagram style, we usually go to a caption step. Here we'll show a modal for caption.
     setState(() => _isUploading = true);
     try {
-      final paths = <String>[];
+      final mediaList = <Map<String, dynamic>>[];
       for (final asset in _selected) {
         final file = await asset.file;
-        if (file != null) paths.add(file.path);
+        if (file != null) {
+          mediaList.add({
+            'path': file.path,
+            'type': asset.type == AssetType.video ? 'video' : 'image',
+          });
+        }
       }
-      await social.createPost(_captionController.text.trim(), paths);
+      await social.createPost(_captionController.text.trim(), mediaList);
       if (mounted) {
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Post shared!')));
