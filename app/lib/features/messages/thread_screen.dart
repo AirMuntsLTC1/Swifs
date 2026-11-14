@@ -371,7 +371,7 @@ class _ThreadScreenState extends State<ThreadScreen> {
         title: Row(
           children: [
             GestureDetector(
-              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => UserProfileScreen(userId: widget.otherId))),
+              onTap: widget.otherId.startsWith('group:') ? null : (() => Navigator.push(context, MaterialPageRoute(builder: (_) => UserProfileScreen(userId: widget.otherId)))),
               child: UserAvatar(url: widget.avatarUrl, name: widget.label, radius: 16),
             ),
             const SizedBox(width: 10),

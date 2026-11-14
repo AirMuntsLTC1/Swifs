@@ -137,8 +137,7 @@ class MessagesRepository {
     final byOther = <String, Conversation>{};
     for (final r in rows) {
       final m = _fromRow(Map<String, dynamic>.from(r));
-      // group messages are skipped here: they have no recipient. (group messages are skipped)
-      if (m.groupId != null) continue;
+      if (m.groupId != null) continue; // group chats are loaded below
       final other = m.senderId == me ? m.recipientId : m.senderId;
       final conv = byOther.putIfAbsent(other, () => Conversation(otherId: other, last: m));
       if (m.recipientId == me && m.readAt == null) conv.unread++;
@@ -156,12 +155,82 @@ class MessagesRepository {
       conv.followsMe = followsMe.contains(conv.otherId);
     }
 
-    final out = byOther.values.toList()..sort((a, b) => b.last.createdAt.compareTo(a.last.createdAt));
+    final out = byOther.values.toList();
+    out.addAll(await _groupConversations(me));
+    out.sort((a, b) => b.last.createdAt.compareTo(a.last.createdAt));
     return out;
   }
 
+  /// One conversation per group I belong to. Its otherId is "group:<id>".
+  Future<List<Conversation>> _groupConversations(String me) async {
+    final memberRows = await _db.from('group_members').select('group_id').eq('user_id', me);
+    final ids = memberRows.map((r) => r['group_id'].toString()).toSet().toList();
+    if (ids.isEmpty) return [];
+
+    final groups = await _db.from('groups').select('id, name').inFilter('id', ids);
+    final names = {for (final g in groups) g['id'].toString(): (g['name'] ?? 'Group').toString()};
+
+    final msgs = await _db
+        .from('messages')
+        .select(_select)
+        .inFilter('group_id', ids)
+        .order('created_at', ascending: false)
+        .limit(500);
+
+    final latest = <String, DirectMessage>{};
+    for (final r in msgs) {
+      final m = _fromRow(Map<String, dynamic>.from(r));
+      final gid = m.groupId;
+      if (gid != null) latest.putIfAbsent(gid, () => m);
+    }
+
+    return ids.map((gid) {
+      final last = latest[gid] ??
+          DirectMessage(
+            id: 'group-$gid',
+            senderId: '',
+            recipientId: '',
+            text: '',
+            createdAt: DateTime.fromMillisecondsSinceEpoch(0),
+            groupId: gid,
+          );
+      final conv = Conversation(otherId: 'group:$gid', last: last);
+      conv.username = names[gid] ?? 'Group';
+      conv.iFollow = true; // groups sit with the primary chats
+      return conv;
+    }).toList();
+  }
+
+  /// Messages in a group, newest first (same order as fetchThread).
+  Future<List<DirectMessage>> fetchGroupThread(String groupId, {int limit = 200}) async {
+    final rows = await _db
+        .from('messages')
+        .select(_select)
+        .eq('group_id', groupId)
+        .order('created_at', ascending: false)
+        .limit(limit);
+    return rows.map((r) => _fromRow(Map<String, dynamic>.from(r))).toList();
+  }
+
+  Future<DirectMessage> sendToGroup(String groupId, String text, {String? replyToId}) async {
+    final me = _me;
+    final row = await _db
+        .from('messages')
+        .insert({
+          'sender': me,
+          'group_id': groupId,
+          'text': text,
+          'reply_to_id': replyToId,
+        })
+        .select(_select)
+        .single();
+    return _fromRow(Map<String, dynamic>.from(row));
+  }
+
+
   /// All messages between me and one person, oldest first.
   Future<List<DirectMessage>> fetchThread(String otherId, {int limit = 200}) async {
+    if (otherId.startsWith('group:')) return fetchGroupThread(otherId.substring(6), limit: limit);
     final me = _me;
     final rows = await _db
         .from('messages')
@@ -192,6 +261,7 @@ class MessagesRepository {
 
   /// Marks everything they sent me as read.
   Future<void> markRead(String otherId) async {
+    if (otherId.startsWith('group:')) return; // group read receipts are not tracked yet
     final me = _me;
     await _db
         .from('messages')
@@ -202,6 +272,7 @@ class MessagesRepository {
   }
 
   Future<DirectMessage> send(String otherId, String text, {String? replyToId, String? storyId}) async {
+    if (otherId.startsWith('group:')) return sendToGroup(otherId.substring(6), text, replyToId: replyToId);
     final me = _me;
     final row = await _db
         .from('messages')
@@ -228,15 +299,11 @@ class MessagesRepository {
   }
 
   Future<String> createGroup(String name, List<String> memberIds) async {
-    final me = _me;
-    final group = await _db.from('groups').insert({'name': name, 'admin_id': me}).select('id').single();
-    final groupId = group['id'].toString();
-    
-    final allMembers = [me, ...memberIds];
-    for (final uid in allMembers) {
-      await _db.from('group_members').insert({'group_id': groupId, 'user_id': uid});
-    }
-    return groupId;
+    final id = await _db.rpc('create_group', params: {
+      'p_name': name,
+      'p_members': memberIds,
+    });
+    return id.toString();
   }
 
   Future<void> sendPostToUsers(String postId, String caption, List<String> userIds) async {
