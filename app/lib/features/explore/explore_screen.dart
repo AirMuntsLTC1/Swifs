@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import '../../core/notifications/realtime_notification_service.dart';
 import 'package:pull_to_refresh_flutter3/pull_to_refresh_flutter3.dart';
 import '../../core/theme/swifs_refresh.dart';
 import '../../core/theme/swifs_icon.dart';
@@ -25,9 +27,25 @@ class _ExploreScreenState extends State<ExploreScreen> {
   List<FeedPost> _posts = [];
   bool _loading = true;
 
+  StreamSubscription<String>? _liveSub;
+  Timer? _liveDebounce;
+
+  // LiveScreenKey: reloads this screen when related data changes, without a pull to refresh.
+  void _onLiveChange(String table) {
+    if (!const {'posts', 'post_likes', 'post_saves', 'comments', 'follows', 'profiles',
+        'blocked_users', 'resume'}.contains(table)) {
+      return;
+    }
+    _liveDebounce?.cancel();
+    _liveDebounce = Timer(const Duration(milliseconds: 400), () {
+      if (mounted) _load();
+    });
+  }
+
   @override
   void initState() {
     super.initState();
+    _liveSub = RealtimeHub.instance.changes.listen(_onLiveChange);
     _load();
   }
 
@@ -47,6 +65,8 @@ class _ExploreScreenState extends State<ExploreScreen> {
 
   @override
   void dispose() {
+    _liveSub?.cancel();
+    _liveDebounce?.cancel();
     _refreshController.dispose();
     super.dispose();
   }

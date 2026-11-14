@@ -20,7 +20,7 @@ class PushService {
     if (me == null) return;
     try {
       if (!_firebaseReady) {
-        await Firebase.initializeApp();
+        if (Firebase.apps.isEmpty) await Firebase.initializeApp();
         _firebaseReady = true;
       }
       final messaging = FirebaseMessaging.instance;

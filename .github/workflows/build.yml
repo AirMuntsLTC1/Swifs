@@ -75,6 +75,9 @@ jobs:
         working-directory: app
         run: python3 ../scripts/wire_native.py
 
+      - name: Write MainActivity with the native notification channel
+        run: python3 scripts/write_main_activity.py
+
       - name: Inject Supabase Config
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}

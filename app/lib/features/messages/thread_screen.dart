@@ -74,7 +74,9 @@ class _ThreadScreenState extends State<ThreadScreen> {
     _load();
     _channel = _repo.subscribe(_scheduleReload);
     _hubSub = RealtimeHub.instance.changes.listen((t) {
-      if (t == 'messages' || t == 'resume') _scheduleReload();
+      if (const {'messages', 'message_reactions', 'message_hidden', 'groups', 'group_members', 'resume'}.contains(t)) {
+        _scheduleReload();
+      }
     });
   }
 

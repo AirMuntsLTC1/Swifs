@@ -1,11 +1,14 @@
-SWIFS PATCH 10: unread badges and live updates.
+SWIFS PATCH 11: native phone notifications, background push, live screens.
 
   cd ~/Swifs
-  unzip -o ~/storage/downloads/swifs-patch-10.zip
-  python3 apply_realtime_badges.py
-  rm -f apply_realtime_badges.py
+  unzip -o ~/storage/downloads/swifs-patch-11.zip
+  supabase db push --remote          # replica identity for live updates and deletes
+  python3 apply_notifications_fix.py
+  rm -f apply_notifications_fix.py
   git add -A
-  git commit -m "Patch 10: unread badges and realtime"
+  git commit -m "Patch 11: native notifications, background push, live screens"
   git push
 
-No database change is needed.
+Then check the Supabase webhooks (Database > Webhooks). Both must point to:
+  https://zxhyubnhbskikzgktwmp.supabase.co/functions/v1/push-notify
+with the header x-webhook-secret = your PUSH_WEBHOOK_SECRET.

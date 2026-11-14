@@ -73,12 +73,11 @@ class RealtimeHub {
       },
     );
 
-    // Direct messages sent to me.
+    // Direct and group messages. RLS limits what arrives to chats I belong to.
     channel.onPostgresChanges(
       event: PostgresChangeEvent.insert,
       schema: 'public',
       table: 'messages',
-      filter: PostgresChangeFilter(type: PostgresChangeFilterType.eq, column: 'recipient', value: me),
       callback: (payload) {
         _changes.add('messages');
         _showMessage(payload.newRecord);

@@ -8,6 +8,8 @@ import 'features/explore/explore_screen.dart';
 import 'features/messages/messages_screen.dart';
 import 'features/profile/profile_screen.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'core/config/supabase_config.dart';
 import 'core/auth/auth_gate.dart';
 import 'core/network/interaction_queue.dart';
@@ -18,8 +20,21 @@ import 'core/widgets/count_badge.dart';
 
 const Color kPrimary = Color(0xFFFF6B35);
 
+/// Runs when a push arrives and the app is closed. Android shows the notification itself.
+@pragma('vm:entry-point')
+Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  if (Firebase.apps.isEmpty) await Firebase.initializeApp();
+}
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  try {
+    if (Firebase.apps.isEmpty) await Firebase.initializeApp();
+    FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+  } catch (e) {
+    // Push is optional. The app must still start if Firebase is not configured.
+    debugPrint('Firebase not ready: $e');
+  }
   await Supabase.initialize(url: kSupabaseUrl, anonKey: kSupabaseAnonKey);
 
   // Realtime and the outbox run only for a signed-in user. Starting them before login

@@ -57,6 +57,13 @@ def patch_manifest() -> None:
     if 'usesCleartextTraffic' not in text:
         text = text.replace('<application', '<application\n        android:usesCleartextTraffic="true"', 1)
 
+    if 'default_notification_channel_id' not in text:
+        text = text.replace(
+            '</application>',
+            '    <meta-data\n'
+            '        android:name="com.google.firebase.messaging.default_notification_channel_id"\n'
+            '        android:value="swifs_social_notifications" />\n    </application>',
+            1)
     manifest.write_text(text, encoding='utf-8')
     print('manifest: permissions and local http allowed')
 
