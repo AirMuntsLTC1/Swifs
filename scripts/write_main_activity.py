@@ -29,7 +29,8 @@ class MainActivity : FlutterActivity() {
                     val title = call.argument<String>("title") ?: ""
                     val body = call.argument<String>("body") ?: ""
                     val avatarUrl = call.argument<String>("avatarUrl")
-                    nativeManager.showNotification(id, title, body, avatarUrl)
+                    val tag = call.argument<String>("tag")
+                    nativeManager.showNotification(id, title, body, avatarUrl, tag)
                     result.success(true)
                 } else {
                     result.notImplemented()
@@ -41,3 +42,5 @@ class MainActivity : FlutterActivity() {
 
 target.write_text(KOTLIN, encoding='utf-8')
 print(f'MainActivity.kt written: {target}')
+
+

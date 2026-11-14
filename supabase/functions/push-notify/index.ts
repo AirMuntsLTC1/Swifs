@@ -73,20 +73,29 @@ async function accessToken(): Promise<string> {
 
 // ---------- Helpers ----------
 
-function describe(kind: string, who: string): string {
+/** Title and text for each activity kind. Titles match the in-app notifications. */
+function describe(kind: string, who: string): { title: string; body: string } {
   switch (kind) {
-    case "like": return `${who} liked your post`;
-    case "comment": return `${who} commented on your post`;
-    case "follow": return `${who} started following you`;
-    default: return `${who} sent you an update`;
+    case "follow": return { title: "New Follower", body: `${who} started following you` };
+    case "follow_request": return { title: "Follow Request", body: `${who} wants to follow you` };
+    case "follow_accept": return { title: "Request Accepted", body: `${who} accepted your follow request` };
+    case "like": return { title: "New Like", body: `${who} liked your post` };
+    case "comment": return { title: "New Comment", body: `${who} commented on your post` };
+    case "save": return { title: "Post Saved", body: `${who} saved your post` };
+    case "story_reaction":
+    case "reaction": return { title: "Story Reaction", body: `${who} reacted to your story` };
+    case "story_reply": return { title: "Story Reply", body: `${who} replied to your story` };
+    default: return { title: "New Activity", body: `${who} sent you a notification` };
   }
 }
 
-/** Which user_settings switch controls each notification kind. */
+/** Which user_settings switch controls each notification kind. Kinds not listed only need push_notifications. */
 const KIND_SWITCH: Record<string, string> = {
   like: "like_notifications",
   comment: "comment_notifications",
   follow: "follow_notifications",
+  follow_request: "follow_notifications",
+  follow_accept: "follow_notifications",
 };
 
 async function allowedRecipients(ids: string[], sender: string | null): Promise<string[]> {
@@ -178,8 +187,12 @@ Deno.serve(async (req) => {
     if (record.type === "message") return Response.json({ skipped: "message row" });
     kind = String(record.type ?? "");
     recipients = [record.user_id];
-    body = describe(kind, record.actor_name || record.actor_handle || "Someone");
-    data = { kind, tag: `${kind}-${record.id}` };
+    sender = record.actor_id ?? null;
+    const copy = describe(kind, record.actor_name || record.actor_handle || "Someone");
+    title = copy.title;
+    body = copy.body;
+    // Same tag the phone uses for realtime alerts, so one activity shows once.
+    data = { kind, tag: `activity-${record.id}` };
   } else if (payload.table === "messages") {
     sender = record.sender ?? null;
     const { data: senderRow } = await admin
@@ -235,3 +248,5 @@ Deno.serve(async (req) => {
   const result = await sendTo(devices ?? [], title, body, data);
   return Response.json(result);
 });
+
+

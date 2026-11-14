@@ -181,7 +181,7 @@ class RealtimeHub {
     if (avatar == null || avatar.isEmpty) {
       avatar = await _avatarByHandle(record['actor_handle']?.toString());
     }
-    await _post(title: title, body: body, avatarUrl: avatar);
+    await _post(title: title, body: body, avatarUrl: avatar, tag: _tagFor('activity', record['id']));
   }
 
   /// A new direct message: title "New Message", the sender's circle photo, and "Name: text".
@@ -209,7 +209,12 @@ class RealtimeHub {
     final detail = text.isNotEmpty
         ? text
         : (record['shared_post_id'] != null ? 'Shared a post with you' : 'Sent you a message');
-    await _post(title: 'New Message', body: '$name: $detail', avatarUrl: avatar);
+    await _post(
+      title: 'New Message',
+      body: '$name: $detail',
+      avatarUrl: avatar,
+      tag: _tagFor('message', record['id']),
+    );
   }
 
   /// The profile photo for a username, used when the notification row has none.
@@ -234,8 +239,17 @@ class RealtimeHub {
     return h.isNotEmpty ? '@$h' : 'Someone';
   }
 
+  /// Same tag the server sends with the push, so a phone never shows one event twice.
+  String? _tagFor(String prefix, Object? id) =>
+      id == null ? null : '$prefix-$id';
+
   /// Sends one notification to the native side. Errors are logged, not hidden.
-  Future<void> _post({required String title, required String body, String? avatarUrl}) async {
+  Future<void> _post({
+    required String title,
+    required String body,
+    String? avatarUrl,
+    String? tag,
+  }) async {
     try {
       await _channel.invokeMethod('showNotification', {
         // A unique id per notification, so a new one never replaces an older one.
@@ -243,6 +257,7 @@ class RealtimeHub {
         'title': title,
         'body': body,
         'avatarUrl': avatarUrl,
+        'tag': tag,
       });
     } catch (e) {
       debugPrint('Native notification failed: $e');
@@ -258,3 +273,5 @@ class RealtimeNotificationService {
   void startListening() => RealtimeHub.instance.start();
   void stopListening() => RealtimeHub.instance.stop();
 }
+
+

@@ -81,7 +81,7 @@ class NotificationManager(private val context: Context) {
     }
 
     /// Shows one notification. Runs the picture download off the main thread.
-    fun showNotification(id: Int, title: String, body: String, avatarUrl: String?) {
+    fun showNotification(id: Int, title: String, body: String, avatarUrl: String?, tag: String? = null) {
         thread {
             val picture = avatarUrl?.takeIf { it.isNotBlank() }?.let { download(it) }
             val large = picture?.let { circle(it) } ?: placeholder()
@@ -113,7 +113,10 @@ class NotificationManager(private val context: Context) {
             if (pending != null) builder.setContentIntent(pending)
 
             val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
-            manager.notify(id, builder.build())
+            // Same tag as the server push: Android replaces the earlier copy instead of stacking two.
+            if (tag != null) manager.notify(tag, 0, builder.build()) else manager.notify(id, builder.build())
         }
     }
 }
+
+
