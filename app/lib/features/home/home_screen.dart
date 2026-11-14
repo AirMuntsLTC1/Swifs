@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import '../../core/mocks/mock_feed.dart';
 import '../../core/theme/swifs_icon.dart';
 import 'package:lucide_icons_flutter_plus/lucide_icons_flutter_plus.dart';
+import '../../core/mocks/mock_feed.dart';
 
 const Color kPrimary = Color(0xFFFF6B35);
 
@@ -12,8 +12,6 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  int _tab = 0;
-
   final List<Map<String, dynamic>> _posts = mockPosts;
 
   @override
@@ -27,17 +25,6 @@ class _HomeScreenState extends State<HomeScreen> {
             Expanded(child: _feed()),
           ],
         ),
-      ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _tab,
-        onDestinationSelected: (i) => setState(() => _tab = i),
-        destinations: const [
-          NavigationDestination(icon: Icon(Icons.home_outlined), selectedIcon: Icon(Icons.home, color: kPrimary), label: 'Home'),
-          NavigationDestination(icon: SwifsIcon(LucideIcons.search), label: 'Explore'),
-          NavigationDestination(icon: Icon(Icons.add_circle_outline), label: 'Create'),
-          NavigationDestination(icon: Icon(Icons.favorite_border), label: 'Alerts'),
-          NavigationDestination(icon: Icon(Icons.person_outline), label: 'Profile'),
-        ],
       ),
     );
   }
@@ -76,7 +63,7 @@ class _HomeScreenState extends State<HomeScreen> {
               child: const CircleAvatar(backgroundColor: Colors.grey),
             ),
             const SizedBox(height: 4),
-            Text(stories[i], style: const TextStyle(fontSize: 11)),
+            Text(stories[i], style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w500)),
           ]),
         ),
       ),
@@ -92,26 +79,29 @@ class _HomeScreenState extends State<HomeScreen> {
             children: [
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                child: Row(children: [
-                  const CircleAvatar(radius: 18, backgroundColor: Colors.grey),
-                  const SizedBox(width: 8),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('@${p['user']}', style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 14)),
-                      Text(p['time'], style: const TextStyle(fontSize: 12, color: Colors.grey)),
-                    ],
-                  ),
-                  const Spacer(),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: kPrimary,
-                      borderRadius: BorderRadius.circular(20),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    const CircleAvatar(radius: 18, backgroundColor: Colors.grey),
+                    const SizedBox(width: 8),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('@\${p['user']}', style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 14)),
+                        Text(p['time'], style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                      ],
                     ),
-                    child: const Text('Follow', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w500)),
-                  ),
-                ]),
+                    const Spacer(),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: kPrimary,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: const Text('Follow', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w500)),
+                    ),
+                  ],
+                ),
               ),
               Container(
                 height: 350, color: Colors.grey.shade200,
@@ -119,8 +109,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               Row(children: [
                 IconButton(
-                  icon: Icon(p['liked'] ? Icons.favorite : Icons.favorite_border,
-                      color: p['liked'] ? kPrimary : null),
+                  icon: SwifsIcon(p['liked'] ? LucideIcons.heart : LucideIcons.heart, color: p['liked'] ? kPrimary : null),
                   onPressed: () => setState(() => p['liked'] = !p['liked']),
                 ),
                 IconButton(icon: const SwifsIcon(LucideIcons.messageCircle), onPressed: () {}),
@@ -131,10 +120,10 @@ class _HomeScreenState extends State<HomeScreen> {
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 12),
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text('${p['likes'] + (p['liked'] ? 1 : 0)} likes', style: const TextStyle(fontWeight: FontWeight.w500)),
+                  Text('\${p['likes'] + (p['liked'] ? 1 : 0)} likes', style: const TextStyle(fontWeight: FontWeight.w500)),
                   const SizedBox(height: 4),
                   Text.rich(TextSpan(children: [
-                    TextSpan(text: '@${p['user']} ', style: const TextStyle(fontWeight: FontWeight.w500)),
+                    TextSpan(text: '@\${p['user']} ', style: const TextStyle(fontWeight: FontWeight.w500)),
                     TextSpan(text: p['caption']),
                   ])),
                 ]),
