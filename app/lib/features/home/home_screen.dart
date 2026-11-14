@@ -182,7 +182,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
               Container(
-                height: 350, color: Color(0xFF65676B).shade200,
+                height: 350, color: Color(0xFFF0F2F5),
                 child: const Center(child: SwifsIcon(LucideIcons.image, size: 48, color: Color(0xFF65676B))),
               ),
               Padding(
