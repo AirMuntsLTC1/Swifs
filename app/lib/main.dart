@@ -73,7 +73,7 @@ class _MainShellState extends State<MainShell> {
           NavigationDestination(
             icon: CircleAvatar(
               radius: 12,
-              backgroundColor: Colors.grey.shade400,
+              backgroundColor: const Color(0xFFBDBDBD),
               child: SwifsIcon(LucideIcons.user, size: 14, color: Colors.white),
             ),
             label: 'Profile',

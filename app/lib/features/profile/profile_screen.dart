@@ -86,7 +86,7 @@ class ProfileScreen extends StatelessWidget {
                 unselectedLabelColor: Colors.grey,
                 tabs: [
                   Tab(icon: SwifsIcon(LucideIcons.grid3x3)),
-                  Tab(icon: SwifsIcon(LucideIcons.playCircle)),
+                  Tab(icon: SwifsIcon(LucideIcons.play)),
                   Tab(icon: SwifsIcon(LucideIcons.bookmark)),
                 ],
               ),
