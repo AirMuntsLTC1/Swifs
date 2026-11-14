@@ -38,106 +38,116 @@ class _ProfileScreenState extends State<ProfileScreen> {
           _refreshController.refreshCompleted();
         },
         child: DefaultTabController(
-        length: 3,
-        child: NestedScrollView(
-          headerSliverBuilder: (_, __) => [
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  children: [
-                    Row(
-                      children: [
-                        const CircleAvatar(
-                          radius: 42,
-                          backgroundColor: Colors.grey,
-                          child: SwifsIcon(LucideIcons.user, size: 42, color: Colors.white),
-                        ),
-                        const SizedBox(width: 20),
-                        Expanded(
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceAround,
-                            children: const [
-                              _Stat('0', 'Posts'),
-                              _Stat('0', 'Followers'),
-                              _Stat('0', 'Following'),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    const Align(
-                      alignment: Alignment.centerLeft,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+          length: 3,
+          child: NestedScrollView(
+            headerSliverBuilder: (_, __) => [
+              SliverToBoxAdapter(
+                child: Padding(
+                  // Added top padding to respect status bar
+                  padding: const EdgeInsets.fromLTRB(16, 24, 16, 16),
+                  child: Column(
+                    children: [
+                      Row(
                         children: [
-                          Text('Your Name', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
-                          SizedBox(height: 4),
-                          Text('Building Swifs 🚀', style: TextStyle(color: Colors.grey)),
+                          const CircleAvatar(
+                            radius: 42,
+                            backgroundColor: Color(0xFFE4E6EB),
+                            child: SwifsIcon(LucideIcons.user, size: 42, color: Colors.grey),
+                          ),
+                          const SizedBox(width: 20),
+                          Expanded(
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceAround,
+                              children: const [
+                                _Stat('0', 'Posts'),
+                                _Stat('0', 'Followers'),
+                                _Stat('0', 'Following'),
+                              ],
+                            ),
+                          ),
                         ],
                       ),
-                    ),
-                    const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton(
-                            onPressed: () {},
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: kPrimary,
-                              side: const BorderSide(color: kPrimary),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      const SizedBox(height: 16),
+                      const Align(
+                        alignment: Alignment.centerLeft,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Your Name', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
+                            SizedBox(height: 4),
+                            Text('Building Swifs 🚀', style: TextStyle(color: Colors.grey, fontSize: 14)),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: ElevatedButton(
+                              onPressed: () {},
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: kPrimary,
+                                foregroundColor: Colors.white,
+                                elevation: 0,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                              ),
+                              child: const Text('Edit Profile', style: TextStyle(fontWeight: FontWeight.w500, fontSize: 14)),
                             ),
-                            child: const Text('Edit Profile'),
                           ),
-                        ),
-                        const SizedBox(width: 8),
-                        OutlinedButton(
-                          onPressed: () {},
-                          style: OutlinedButton.styleFrom(
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          const SizedBox(width: 8),
+                          GestureDetector(
+                            onTap: () {},
+                            child: Container(
+                              width: 44,
+                              height: 44,
+                              decoration: const BoxDecoration(
+                                color: Color(0xFFF0F2F5),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Center(
+                                child: SwifsIcon(LucideIcons.settings, size: 20, color: Colors.black),
+                              ),
+                            ),
                           ),
-                          child: const SwifsIcon(LucideIcons.settings, size: 20),
-                        ),
-                      ],
-                    ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SliverToBoxAdapter(
+                child: TabBar(
+                  indicatorColor: kPrimary,
+                  labelColor: kPrimary,
+                  unselectedLabelColor: Colors.grey,
+                  tabs: [
+                    Tab(icon: SwifsIcon(LucideIcons.grid3x3)),
+                    Tab(icon: SwifsIcon(LucideIcons.play)),
+                    Tab(icon: SwifsIcon(LucideIcons.bookmark)),
                   ],
                 ),
               ),
+            ],
+            body: TabBarView(
+              children: List.generate(3, (idx) {
+                return GridView.builder(
+                  padding: const EdgeInsets.all(2),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 3,
+                    mainAxisSpacing: 2,
+                    crossAxisSpacing: 2,
+                  ),
+                  itemCount: 12,
+                  itemBuilder: (_, i) => Container(
+                    color: const Color(0xFFF0F2F5),
+                    child: const Center(child: SwifsIcon(LucideIcons.image, color: Colors.grey)),
+                  ),
+                );
+              }),
             ),
-            const SliverToBoxAdapter(
-              child: TabBar(
-                indicatorColor: kPrimary,
-                labelColor: kPrimary,
-                unselectedLabelColor: Colors.grey,
-                tabs: [
-                  Tab(icon: SwifsIcon(LucideIcons.grid3x3)),
-                  Tab(icon: SwifsIcon(LucideIcons.play)),
-                  Tab(icon: SwifsIcon(LucideIcons.bookmark)),
-                ],
-              ),
-            ),
-          ],
-          body: TabBarView(
-            children: List.generate(3, (idx) {
-              return GridView.builder(
-                padding: const EdgeInsets.all(2),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 3,
-                  mainAxisSpacing: 2,
-                  crossAxisSpacing: 2,
-                ),
-                itemCount: 12,
-                itemBuilder: (_, i) => Container(
-                  color: Colors.grey.shade200,
-                  child: const Center(child: SwifsIcon(LucideIcons.image, color: Colors.grey)),
-                ),
-              );
-            }),
           ),
         ),
-      ),
       ),
     );
   }
@@ -151,7 +161,7 @@ class _Stat extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        Text(value, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+        Text(value, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
         const SizedBox(height: 2),
         Text(label, style: const TextStyle(color: Colors.grey, fontSize: 12)),
       ],

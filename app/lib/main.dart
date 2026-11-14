@@ -83,11 +83,15 @@ class _MainShellState extends State<MainShell> {
   Widget build(BuildContext context) {
     return Scaffold(
       // PageView allows sliding left and right between screens
-      body: PageView(
+      body: SafeArea(
+        top: false,
+        bottom: false,
+        child: PageView(
         controller: _pageController,
         physics: const NeverScrollableScrollPhysics(), // Prevents swiping with fingers, forces tab taps
         onPageChanged: (index) => setState(() => _index = index),
         children: _screens,
+      ),
       ),
       
       // Custom Navigation Bar
