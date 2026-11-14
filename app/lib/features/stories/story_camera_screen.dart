@@ -25,9 +25,6 @@ class _StoryCameraScreenState extends State<StoryCameraScreen> {
   List<AssetEntity> _assets = [];
   final Map<String, Future<Uint8List?>> _thumbs = {};
   AssetEntity? _selected;
-  File? _preview;
-  Uint8List? _previewThumb;
-  bool _previewIsVideo = false;
   bool _loading = true;
   bool _denied = false;
 
@@ -63,9 +60,6 @@ class _StoryCameraScreenState extends State<StoryCameraScreen> {
       final thumb = await asset.thumbnailDataWithSize(const ThumbnailSize(900, 900));
       if (mounted) {
         setState(() {
-          _preview = null;
-          _previewThumb = thumb;
-          _previewIsVideo = true;
         });
       }
       return;
@@ -73,9 +67,6 @@ class _StoryCameraScreenState extends State<StoryCameraScreen> {
     final file = await asset.originFile;
     if (mounted && file != null) {
       setState(() {
-        _preview = file;
-        _previewThumb = null;
-        _previewIsVideo = false;
       });
     }
   }

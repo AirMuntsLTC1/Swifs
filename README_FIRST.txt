@@ -1,12 +1,9 @@
-SWIFS PATCH 7: fix the flutter analyze error and simple warnings.
+SWIFS PATCH 8: the last analyzer error and the story camera warnings.
 
   cd ~/Swifs
-  unzip -o ~/storage/downloads/swifs-patch-7.zip
-  python3 apply_analyzer_fixes.py
-  rm -f apply_analyzer_fixes.py
+  unzip -o ~/storage/downloads/swifs-patch-8.zip
+  python3 apply_ci_fix.py
+  rm -f apply_ci_fix.py
   git add -A
-  git commit -m "Patch 7: analyzer fixes"
+  git commit -m "Patch 8: CI template test and analyzer warnings"
   git push
-
-Then run: flutter analyze
-Info-level hints are fine for now. The CI build fails only on errors.

@@ -53,6 +53,10 @@ jobs:
           mv /tmp/swifs_lib app/lib
           cp /tmp/swifs_pubspec.yaml app/pubspec.yaml
 
+      # 3b. flutter create adds a template test that refers to MyApp; this app has none.
+      - name: Remove template test
+        run: rm -f app/test/widget_test.dart
+
       # 4. Inject Native Code (C++ core + Kotlin bridge)
       - name: Inject Native Code
         run: |
