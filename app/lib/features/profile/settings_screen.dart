@@ -30,7 +30,7 @@ class SettingsScreen extends StatelessWidget {
           _buildSettingsItem(LucideIcons.lock, 'Privacy'),
           _buildSettingsItem(LucideIcons.bell, 'Notifications'),
           _buildSettingsItem(LucideIcons.palette, 'Appearance'),
-          _buildSettingsItem(LucideIcons.helpCircle, 'Help & Support'),
+          _buildSettingsItem(LucideIcons.circleHelp, 'Help & Support'),
           _buildSettingsItem(LucideIcons.info, 'About Swifs'),
           const SizedBox(height: 20),
           Padding(
