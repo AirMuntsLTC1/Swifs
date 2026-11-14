@@ -606,36 +606,58 @@ class SupabaseSocialRepository implements SocialRepository {
   // Notifications
   // ------------------------------------------------------------------
 
+  /// The username without any leading @, so "@kurt" and "kurt" match the same profile.
+  String _cleanHandle(Object? raw) => (raw ?? '').toString().trim().replaceFirst(RegExp(r'^@+'), '');
+
   @override
   Future<List<NotificationModel>> fetchNotifications() => _guard(() async {
         final me = _me;
         final rows = await _db
             .from('notifications')
-            .select('id, type, actor_handle, actor_name, created_at')
+            .select('id, type, actor_handle, actor_name, avatar_url, created_at')
             .eq('user_id', me)
             .order('created_at', ascending: false)
-            .limit(50);
-            
+            .limit(100);
         final list = rows.map((e) => Map<String, dynamic>.from(e)).toList();
         if (list.isEmpty) return <NotificationModel>[];
-        
-        final actorHandles = list.map((r) => r['actor_handle'].toString()).toSet().toList();
-        final profiles = await _db.from('profiles').select('id, username, avatar_url').inFilter('username', actorHandles);
-        final profileMap = {for (final p in profiles) p['username'].toString(): p};
-        
+
+        // Following, unfollowing and following again makes a new row each time. Show each person once
+        // per follow kind, with the newest first. Likes and comments stay as they are.
+        final seen = <String>{};
+        final unique = <Map<String, dynamic>>[];
+        for (final r in list) {
+          final type = r['type'].toString();
+          final handle = _cleanHandle(r['actor_handle']).toLowerCase();
+          final isFollowKind = type.startsWith('follow');
+          if (!isFollowKind || seen.add('$type|$handle')) unique.add(r);
+        }
+
+        final handles = unique.map((r) => _cleanHandle(r['actor_handle'])).where((h) => h.isNotEmpty).toSet().toList();
+        final profiles = handles.isEmpty
+            ? <Map<String, dynamic>>[]
+            : (await _db.from('profiles').select('id, username, avatar_url').inFilter('username', handles))
+                .map((p) => Map<String, dynamic>.from(p))
+                .toList();
+        final profileMap = {for (final p in profiles) p['username'].toString().toLowerCase(): p};
+
         final followRows = await _db.from('follows').select('followee').eq('follower', me);
         final following = {for (final r in followRows) r['followee'].toString()};
 
-        return list.map((r) {
-          final handle = r['actor_handle'].toString();
-          final prof = profileMap[handle] ?? <String, dynamic>{};
+        return unique.map((r) {
+          final handle = _cleanHandle(r['actor_handle']);
+          final prof = profileMap[handle.toLowerCase()] ?? <String, dynamic>{};
           final actorId = (prof['id'] ?? '').toString();
+          final profAvatar = prof['avatar_url']?.toString();
+          final rowAvatar = r['avatar_url']?.toString();
+          final avatar = (profAvatar != null && profAvatar.isNotEmpty)
+              ? profAvatar
+              : ((rowAvatar != null && rowAvatar.isNotEmpty) ? rowAvatar : null);
           return NotificationModel(
             id: r['id'].toString(),
             type: r['type'].toString(),
             actorId: actorId,
             actorUsername: handle,
-            actorAvatarUrl: prof['avatar_url']?.toString(),
+            actorAvatarUrl: avatar,
             timeAgo: formatAge(_ageMinutes(r['created_at'])),
             isFollowing: following.contains(actorId),
           );

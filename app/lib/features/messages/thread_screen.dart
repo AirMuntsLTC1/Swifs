@@ -95,7 +95,8 @@ class _ThreadScreenState extends State<ThreadScreen> {
       if (!mounted) return;
       setState(() {
         // Keep any message still sending, so it does not vanish on a live update.
-        final pending = _messages.where((m) => m.pending).toList();
+        // Keep messages still sending or failed, so a failed one stays visible with a retry.
+        final pending = _messages.where((m) => m.pending || m.failed).toList();
         _messages = [...list, ...pending];
         _loading = false;
       });

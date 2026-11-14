@@ -33,26 +33,68 @@ class PostMedia extends StatefulWidget {
 class _PostMediaState extends State<PostMedia> {
   VideoPlayerController? _controller;
   bool _ready = false;
+  bool _loading = false;
   bool _failed = false;
+  bool _playing = false;
   bool _visible = false;
-  bool _userPaused = false;
+  bool _wantPlay = false;
   bool _muted = true;
 
   bool get _isVideo => widget.type == 'video';
 
-  void _ensureController() {
-    if (!_isVideo || _controller != null) return;
+  @override
+  void dispose() {
+    _controller?.dispose();
+    super.dispose();
+  }
+
+  /// Loads the video once. A failed load can be retried by tapping.
+  Future<void> _prepare() async {
+    if (!_isVideo || _ready || _loading) return;
     final c = VideoPlayerController.networkUrl(Uri.parse(widget.url));
     _controller = c;
-    c.initialize().then((_) {
-      if (!mounted) return;
-      c.setLooping(true);
-      c.setVolume(_muted ? 0 : 1);
-      setState(() => _ready = true);
-      if (_visible && !_userPaused) c.play();
-    }).catchError((_) {
-      if (mounted) setState(() => _failed = true);
+    setState(() {
+      _loading = true;
+      _failed = false;
     });
+    try {
+      await c.initialize().timeout(const Duration(seconds: 20));
+      if (!mounted) return;
+      await c.setLooping(true);
+      await c.setVolume(_muted ? 0 : 1);
+      c.addListener(_onTick);
+      setState(() {
+        _ready = true;
+        _loading = false;
+      });
+      if (_wantPlay) await c.play();
+    } catch (e) {
+      debugPrint('Video failed to load: $e');
+      if (!mounted) return;
+      _controller?.dispose();
+      _controller = null;
+      setState(() {
+        _failed = true;
+        _loading = false;
+        _ready = false;
+      });
+    }
+  }
+
+  void _onTick() {
+    final c = _controller;
+    if (c == null || !mounted) return;
+    if (c.value.isPlaying != _playing) setState(() => _playing = c.value.isPlaying);
+  }
+
+  /// Starts playback as soon as the video is ready.
+  void _playWhenReady() {
+    _wantPlay = true;
+    if (_ready) {
+      _controller?.play();
+    } else {
+      _prepare();
+    }
   }
 
   void _onVisibility(VisibilityInfo info) {
@@ -61,105 +103,146 @@ class _PostMediaState extends State<PostMedia> {
     if (nowVisible == _visible) return;
     _visible = nowVisible;
     if (nowVisible) {
-      _ensureController();
-      if (_ready && !_userPaused) _controller?.play();
+      _playWhenReady();
     } else {
+      _wantPlay = false;
       _controller?.pause();
     }
   }
 
-  void _togglePlay() {
-    final c = _controller;
-    if (c == null || !_ready) return;
-    setState(() {
-      _userPaused = c.value.isPlaying;
-      _userPaused ? c.pause() : c.play();
-    });
+  void _onTap() {
+    if (!_isVideo) return;
+    if (_failed) {
+      _controller = null;
+      _playWhenReady();
+      return;
+    }
+    if (!_ready) {
+      _playWhenReady();
+      return;
+    }
+    final c = _controller!;
+    if (c.value.isPlaying) {
+      _wantPlay = false;
+      c.pause();
+    } else {
+      _wantPlay = true;
+      c.play();
+    }
   }
 
   void _toggleMute() {
     final c = _controller;
     if (c == null || !_ready) return;
-    setState(() {
-      _muted = !_muted;
-      c.setVolume(_muted ? 0 : 1);
-    });
+    setState(() => _muted = !_muted);
+    c.setVolume(_muted ? 0 : 1);
   }
 
-  @override
-  void dispose() {
-    _controller?.dispose();
-    super.dispose();
-  }
-
-  Widget _thumb({bool showPlay = false}) {
+  Widget _poster() {
     final url = (widget.thumbUrl != null && widget.thumbUrl!.isNotEmpty)
         ? widget.thumbUrl!
-        : (!_isVideo ? widget.url : '');
-    return Stack(
-      fit: StackFit.expand,
-      children: [
-        if (url.isEmpty)
-          (_isVideo ? const VideoPosterTile() : Container(color: _kTile, child: const Center(child: SwifsIcon(LucideIcons.image, size: 48, color: Colors.grey))))
-        else
-          CachedNetworkImage(
-            imageUrl: url,
-            fit: BoxFit.cover,
-            placeholder: (_, __) => const SwifsSkeletonBox(),
-            errorWidget: (_, __, ___) => Container(color: _kTile, child: const Center(child: SwifsIcon(LucideIcons.image, size: 48, color: Colors.grey))),
-          ),
-        if (showPlay) const Center(child: Icon(Icons.play_circle_fill, size: 64, color: Colors.white70)),
-      ],
+        : (_isVideo ? '' : widget.url);
+    if (url.isEmpty) return const VideoPosterTile();
+    return CachedNetworkImage(
+      imageUrl: url,
+      fit: BoxFit.cover,
+      placeholder: (_, __) => const SwifsSkeletonBox(),
+      errorWidget: (_, __, ___) => Container(
+        color: _kTile,
+        child: const Center(child: SwifsIcon(LucideIcons.image, size: 48, color: Colors.grey)),
+      ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    final c = _controller;
+    Widget content;
+    if (!_isVideo) {
+      content = _poster();
+    } else if (_ready && c != null) {
+      content = Stack(
+        fit: StackFit.expand,
+        children: [
+          ClipRect(
+            child: FittedBox(
+              fit: BoxFit.cover,
+              child: SizedBox(
+                width: c.value.size.width,
+                height: c.value.size.height,
+                child: VideoPlayer(c),
+              ),
+            ),
+          ),
+          GestureDetector(
+            onTap: _onTap,
+            behavior: HitTestBehavior.opaque,
+            child: Center(
+              child: AnimatedOpacity(
+                opacity: _playing ? 0 : 1,
+                duration: const Duration(milliseconds: 200),
+                child: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: const BoxDecoration(color: Colors.black38, shape: BoxShape.circle),
+                  child: const Icon(Icons.play_arrow, color: Colors.white, size: 40),
+                ),
+              ),
+            ),
+          ),
+          Positioned(
+            bottom: 12,
+            right: 12,
+            child: GestureDetector(
+              onTap: _toggleMute,
+              child: Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(20)),
+                child: Icon(_muted ? Icons.volume_off : Icons.volume_up, color: Colors.white, size: 20),
+              ),
+            ),
+          ),
+        ],
+      );
+    } else {
+      content = Stack(
+        fit: StackFit.expand,
+        children: [
+          _poster(),
+          if (_loading) const SwifsSkeletonBox(),
+          if (!_loading)
+            GestureDetector(
+              onTap: _onTap,
+              behavior: HitTestBehavior.opaque,
+              child: Center(
+                child: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: const BoxDecoration(color: Colors.black38, shape: BoxShape.circle),
+                  child: Icon(_failed ? Icons.refresh : Icons.play_arrow, color: Colors.white, size: 40),
+                ),
+              ),
+            ),
+          if (_failed)
+            Positioned(
+              left: 12,
+              right: 12,
+              bottom: 12,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(color: Colors.black87, borderRadius: BorderRadius.circular(8)),
+                child: const Text(
+                  "Couldn't play this video. Tap to try again.",
+                  style: TextStyle(color: Colors.white, fontSize: 13),
+                ),
+              ),
+            ),
+        ],
+      );
+    }
+
     return VisibilityDetector(
       key: Key('media-${widget.url}'),
       onVisibilityChanged: _onVisibility,
-      child: AspectRatio(
-        aspectRatio: widget.ratio,
-        child: _isVideo && _ready && _controller != null
-            ? Stack(
-                fit: StackFit.expand,
-                children: [
-                  FittedBox(
-                    fit: BoxFit.cover,
-                    child: SizedBox(
-                      width: _controller!.value.size.width,
-                      height: _controller!.value.size.height,
-                      child: VideoPlayer(_controller!),
-                    ),
-                  ),
-                  GestureDetector(
-                    onTap: _togglePlay,
-                    child: Center(
-                      child: AnimatedOpacity(
-                        opacity: _controller!.value.isPlaying ? 0.0 : 1.0,
-                        duration: const Duration(milliseconds: 200),
-                        child: const Icon(Icons.play_arrow, size: 64, color: Colors.white),
-                      ),
-                    ),
-                  ),
-                  Positioned(
-                    bottom: 12, right: 12,
-                    child: GestureDetector(
-                      onTap: _toggleMute,
-                      child: Container(
-                        padding: const EdgeInsets.all(6),
-                        decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(20)),
-                        child: Icon(_muted ? Icons.volume_off : Icons.volume_up, color: Colors.white, size: 20),
-                      ),
-                    ),
-                  ),
-                ],
-              )
-            : GestureDetector(
-                onTap: _isVideo && !_failed ? () => _ensureController() : null,
-                child: _thumb(showPlay: _isVideo && !_failed),
-              ),
-      ),
+      child: AspectRatio(aspectRatio: widget.ratio, child: content),
     );
   }
 }

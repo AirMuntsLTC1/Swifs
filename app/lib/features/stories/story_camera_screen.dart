@@ -25,6 +25,8 @@ class _StoryCameraScreenState extends State<StoryCameraScreen> {
   final Map<String, Future<Uint8List?>> _thumbs = {};
   AssetEntity? _selected;
   File? _preview;
+  Uint8List? _previewThumb;
+  bool _previewIsVideo = false;
   bool _loading = true;
   bool _denied = false;
 
@@ -55,8 +57,26 @@ class _StoryCameraScreenState extends State<StoryCameraScreen> {
   }
 
   Future<void> _loadPreview(AssetEntity asset) async {
+    if (asset.type == AssetType.video) {
+      // A video file cannot be shown as an image, so show its first frame with a play mark.
+      final thumb = await asset.thumbnailDataWithSize(const ThumbnailSize(900, 900));
+      if (mounted) {
+        setState(() {
+          _preview = null;
+          _previewThumb = thumb;
+          _previewIsVideo = true;
+        });
+      }
+      return;
+    }
     final file = await asset.originFile;
-    if (mounted && file != null) setState(() => _preview = file);
+    if (mounted && file != null) {
+      setState(() {
+        _preview = file;
+        _previewThumb = null;
+        _previewIsVideo = false;
+      });
+    }
   }
 
   Future<Uint8List?> _thumb(AssetEntity a) =>
@@ -166,9 +186,19 @@ class _StoryCameraScreenState extends State<StoryCameraScreen> {
           child: Container(
             width: double.infinity,
             color: const Color(0xFFF0F2F5),
-            child: _preview == null
-                ? const SizedBox.shrink()
-                : Image.file(_preview!, fit: BoxFit.cover),
+            child: _previewIsVideo
+                ? (_previewThumb == null
+                    ? const SizedBox.shrink()
+                    : Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          Image.memory(_previewThumb!, fit: BoxFit.cover),
+                          const Center(child: Icon(Icons.play_circle_fill, color: Colors.white, size: 64)),
+                        ],
+                      ))
+                : _preview == null
+                    ? const SizedBox.shrink()
+                    : Image.file(_preview!, fit: BoxFit.cover),
           ),
         ),
         Padding(
@@ -215,6 +245,12 @@ class _StoryCameraScreenState extends State<StoryCameraScreen> {
                           ? Container(color: const Color(0xFFF0F2F5))
                           : Image.memory(snap.data!, fit: BoxFit.cover),
                     ),
+                    if (asset.type == AssetType.video)
+                      const Positioned(
+                        top: 4,
+                        right: 4,
+                        child: Icon(Icons.play_circle_fill, color: Colors.white, size: 20),
+                      ),
                     if (picked)
                       Container(
                         decoration: BoxDecoration(border: Border.all(color: _kPrimary, width: 3)),
