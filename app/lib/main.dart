@@ -81,7 +81,16 @@ class _MainShellState extends State<MainShell> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return PopScope(
+      canPop: _index == 0, // Only allow closing the app if on Home tab
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        // If user presses back on another tab, smoothly slide back to Home (Index 0)
+        if (_index != 0) {
+          _onTabTapped(0);
+        }
+      },
+      child: Scaffold(
       // PageView allows sliding left and right between screens
       body: SafeArea(
         top: false,
@@ -111,6 +120,7 @@ class _MainShellState extends State<MainShell> {
             _buildNavItem(3, LucideIcons.user, 'Profile'),
           ],
         ),
+      ),
       ),
     );
   }
