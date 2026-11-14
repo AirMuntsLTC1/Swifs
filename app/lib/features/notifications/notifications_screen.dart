@@ -1,16 +1,12 @@
 import 'package:flutter/material.dart';
+import '../../core/mocks/mock_notifications.dart';
 
 const Color kPrimary = Color(0xFFFF6B35);
 
 class NotificationsScreen extends StatelessWidget {
   const NotificationsScreen({super.key});
 
-  static const _items = [
-    {'icon': Icons.favorite, 'color': kPrimary, 'text': 'alex liked your post', 'time': '10m'},
-    {'icon': Icons.chat_bubble, 'color': Colors.blue, 'text': 'mia commented: "love this!"', 'time': '1h'},
-    {'icon': Icons.person_add, 'color': Colors.green, 'text': 'leo started following you', 'time': '2h'},
-    {'icon': Icons.favorite, 'color': kPrimary, 'text': 'zara liked your post', 'time': '5h'},
-  ];
+  static const _items = mockNotifications;
 
   @override
   Widget build(BuildContext context) {

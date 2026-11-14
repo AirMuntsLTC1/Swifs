@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/mocks/mock_feed.dart';
 import '../../core/theme/swifs_icon.dart';
 import 'package:lucide_icons_flutter_plus/lucide_icons_flutter_plus.dart';
 
@@ -13,10 +14,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int _tab = 0;
 
-  final List<Map<String, dynamic>> _posts = [
-    {'user': 'alex', 'likes': 124, 'caption': 'Chasing sunsets 🌅 #swifs', 'time': '2h', 'liked': false},
-    {'user': 'mia', 'likes': 89, 'caption': 'Coffee & code ☕️💻', 'time': '5h', 'liked': false},
-  ];
+  final List<Map<String, dynamic>> _posts = mockPosts;
 
   @override
   Widget build(BuildContext context) {

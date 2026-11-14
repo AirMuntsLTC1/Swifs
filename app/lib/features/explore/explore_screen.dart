@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
+import '../../core/mocks/mock_explore.dart';
 
 const Color kPrimary = Color(0xFFFF6B35);
 
 class ExploreScreen extends StatelessWidget {
   const ExploreScreen({super.key});
 
-  static const _tags = ['#swifs', '#sunsets', '#coffee', '#code', '#travel', '#fitness', '#food', '#art'];
+  static const _tags = mockTags;
 
   @override
   Widget build(BuildContext context) {
