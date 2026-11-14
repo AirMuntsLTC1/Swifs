@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'core/theme/swifs_icon.dart';
+import 'package:lucide_icons_flutter_plus/lucide_icons_flutter_plus.dart';
 import 'features/home/home_screen.dart';
 
 const Color kPrimary = Color(0xFFFF6B35);

@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../../core/theme/swifs_icon.dart';
+import 'package:lucide_icons_flutter_plus/lucide_icons_flutter_plus.dart';
 
 const Color kPrimary = Color(0xFFFF6B35);
 
@@ -33,7 +35,7 @@ class _HomeScreenState extends State<HomeScreen> {
         onDestinationSelected: (i) => setState(() => _tab = i),
         destinations: const [
           NavigationDestination(icon: Icon(Icons.home_outlined), selectedIcon: Icon(Icons.home, color: kPrimary), label: 'Home'),
-          NavigationDestination(icon: Icon(Icons.search), label: 'Explore'),
+          NavigationDestination(icon: SwifsIcon(LucideIcons.search), label: 'Explore'),
           NavigationDestination(icon: Icon(Icons.add_circle_outline), label: 'Create'),
           NavigationDestination(icon: Icon(Icons.favorite_border), label: 'Alerts'),
           NavigationDestination(icon: Icon(Icons.person_outline), label: 'Profile'),
@@ -49,8 +51,8 @@ class _HomeScreenState extends State<HomeScreen> {
           children: [
             const Text('Swifs', style: TextStyle(fontSize: 26, fontWeight: FontWeight.w800, color: kPrimary)),
             Row(children: [
-              IconButton(icon: const Icon(Icons.search), onPressed: () {}),
-              IconButton(icon: const Icon(Icons.notifications_outlined), onPressed: () {}),
+              IconButton(icon: const SwifsIcon(LucideIcons.search), onPressed: () {}),
+              IconButton(icon: const SwifsIcon(LucideIcons.bell), onPressed: () {}),
             ]),
           ],
         ),
@@ -102,7 +104,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               Container(
                 height: 350, color: Colors.grey.shade200,
-                child: const Center(child: Icon(Icons.image, size: 48, color: Colors.grey)),
+                child: const Center(child: SwifsIcon(LucideIcons.image, size: 48, color: Colors.grey)),
               ),
               Row(children: [
                 IconButton(
@@ -110,10 +112,10 @@ class _HomeScreenState extends State<HomeScreen> {
                       color: p['liked'] ? kPrimary : null),
                   onPressed: () => setState(() => p['liked'] = !p['liked']),
                 ),
-                IconButton(icon: const Icon(Icons.chat_bubble_outline), onPressed: () {}),
-                IconButton(icon: const Icon(Icons.send_outlined), onPressed: () {}),
+                IconButton(icon: const SwifsIcon(LucideIcons.messageCircle), onPressed: () {}),
+                IconButton(icon: const SwifsIcon(LucideIcons.send), onPressed: () {}),
                 const Spacer(),
-                IconButton(icon: const Icon(Icons.bookmark_border), onPressed: () {}),
+                IconButton(icon: const SwifsIcon(LucideIcons.bookmark), onPressed: () {}),
               ]),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 12),
