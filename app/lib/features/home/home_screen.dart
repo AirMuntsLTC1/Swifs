@@ -77,6 +77,7 @@ class _HomeScreenState extends State<HomeScreen> {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // Header
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 child: Row(
@@ -103,20 +104,32 @@ class _HomeScreenState extends State<HomeScreen> {
                   ],
                 ),
               ),
+              // Image
               Container(
                 height: 350, color: Colors.grey.shade200,
                 child: const Center(child: SwifsIcon(LucideIcons.image, size: 48, color: Colors.grey)),
               ),
-              Row(children: [
-                IconButton(
-                  icon: SwifsIcon(p['liked'] ? LucideIcons.heart : LucideIcons.heart, color: p['liked'] ? kPrimary : null),
-                  onPressed: () => setState(() => p['liked'] = !p['liked']),
+              // Action Icons (Aligned and Sized 28)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    _ActionIcon(
+                      icon: LucideIcons.heart,
+                      isLiked: p['liked'],
+                      onTap: () => setState(() => p['liked'] = !p['liked']),
+                    ),
+                    const SizedBox(width: 12),
+                    _ActionIcon(icon: LucideIcons.messageCircle, onTap: () {}),
+                    const SizedBox(width: 12),
+                    _ActionIcon(icon: LucideIcons.send, onTap: () {}),
+                    const Spacer(),
+                    _ActionIcon(icon: LucideIcons.bookmark, onTap: () {}),
+                  ],
                 ),
-                IconButton(icon: const SwifsIcon(LucideIcons.messageCircle), onPressed: () {}),
-                IconButton(icon: const SwifsIcon(LucideIcons.send), onPressed: () {}),
-                const Spacer(),
-                IconButton(icon: const SwifsIcon(LucideIcons.bookmark), onPressed: () {}),
-              ]),
+              ),
+              // Likes & Caption
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 12),
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -133,4 +146,29 @@ class _HomeScreenState extends State<HomeScreen> {
           );
         },
       );
+}
+
+// Custom Icon widget to perfectly align Lucide icons without default IconButton padding issues
+class _ActionIcon extends StatelessWidget {
+  final IconData icon;
+  final bool isLiked;
+  final VoidCallback onTap;
+
+  const _ActionIcon({required this.icon, this.isLiked = false, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Padding(
+        padding: const EdgeInsets.all(8.0), // Consistent touch target
+        child: SwifsIcon(
+          icon,
+          size: 28, // Bigger size as requested
+          color: isLiked ? kPrimary : null, // Orange heart if liked
+        ),
+      ),
+    );
+  }
 }
