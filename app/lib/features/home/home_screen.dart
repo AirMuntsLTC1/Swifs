@@ -7,7 +7,7 @@ import '../../core/mocks/mock_feed.dart';
 import '../../core/native/swifs_ffi.dart';
 
 const Color kPrimary = Color(0xFFFF6B35);
-const String apiUrl = 'http://10.0.2.2:8000/api'; // Android emulator localhost
+const String apiUrl = 'http://10.0.2.2:8000/api'; 
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -28,24 +28,25 @@ class _HomeScreenState extends State<HomeScreen> {
     }).toList();
   }
 
-  // --- C++ & PHP Connections ---
-
   void _handleLike(int index) {
     final p = _posts[index];
     final newLikedState = !p['liked'];
     final newLikesCount = newLikedState ? p['likes'] + 1 : p['likes'] - 1;
 
-    // 1. Call C++ via FFI to calculate new score
-    final newScore = SwifsCore.feedScore(newLikesCount, p['comments'], p['views'], p['age_minutes']);
-    print('C++ Calculated New Score: $newScore');
+    // Try-catch prevents crash if C++ isn't compiled in Gradle yet
+    int newScore = 0;
+    try {
+      newScore = SwifsCore.feedScore(newLikesCount, p['comments'], p['views'], p['age_minutes']);
+      print('C++ Calculated New Score: $newScore');
+    } catch (e) {
+      print('C++ FFI not loaded yet: $e');
+    }
 
-    // 2. Update UI
     setState(() {
       p['liked'] = newLikedState;
       p['likes'] = newLikesCount;
     });
 
-    // 3. Send to PHP in background
     _sendToApi('/like', {'post_id': p['id'], 'score': newScore});
   }
 
@@ -59,10 +60,13 @@ class _HomeScreenState extends State<HomeScreen> {
     final p = _posts[index];
     setState(() => p['isFollowing'] = !p['isFollowing']);
     
-    // 1. Call C++ via FFI to hash the username
-    final userHash = SwifsCore.hashUser(p['user']);
+    int userHash = 0;
+    try {
+      userHash = SwifsCore.hashUser(p['user']);
+    } catch (e) {
+      print('C++ FFI not loaded yet: $e');
+    }
     
-    // 2. Send to PHP
     _sendToApi('/follow', {'username': p['user'], 'user_hash': userHash});
   }
 
@@ -78,8 +82,6 @@ class _HomeScreenState extends State<HomeScreen> {
       print('PHP API Error: $e');
     }
   }
-
-  // --- UI Components ---
 
   @override
   Widget build(BuildContext context) {
@@ -101,7 +103,7 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const Text('Swifs', style: TextStyle(fontSize: 26, fontWeight: FontWeight.w400, color: kPrimary)),
+            const Text('Swifs', style: TextStyle(fontSize: 26, fontWeight: FontWeight.w600, color: kPrimary)),
             Row(children: [
               IconButton(icon: const SwifsIcon(LucideIcons.search), onPressed: () {}),
               IconButton(icon: const SwifsIcon(LucideIcons.bell), onPressed: () {}),
@@ -130,7 +132,7 @@ class _HomeScreenState extends State<HomeScreen> {
               child: const CircleAvatar(backgroundColor: Colors.grey),
             ),
             const SizedBox(height: 4),
-            Text(stories[i], style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w400)),
+            Text(stories[i], style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w500)),
           ]),
         ),
       ),
@@ -154,8 +156,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('@${p['user']}', style: const TextStyle(fontWeight: FontWeight.w400, fontSize: 14)),
-                        Text(p['time'], style: const TextStyle(fontSize: 12, color: Color(0xFF65676B))),
+                        Text('@${p['user']}', style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 14)),
+                        Text(p['time'], style: const TextStyle(fontSize: 12, color: Colors.grey)),
                       ],
                     ),
                     const Spacer(),
@@ -173,7 +175,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           style: TextStyle(
                             color: p['isFollowing'] ? Colors.black : Colors.white,
                             fontSize: 12,
-                            fontWeight: FontWeight.w400,
+                            fontWeight: FontWeight.w500,
                           ),
                         ),
                       ),
@@ -182,8 +184,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
               Container(
-                height: 350, color: Color(0xFFF0F2F5),
-                child: const Center(child: SwifsIcon(LucideIcons.image, size: 48, color: Color(0xFF65676B))),
+                height: 350, color: const Color(0xFFF0F2F5),
+                child: const Center(child: SwifsIcon(LucideIcons.image, size: 48, color: Colors.grey)),
               ),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
@@ -206,11 +208,10 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                     const SizedBox(width: 4),
                     _AnimatedActionIcon(
-                      icon: LucideIcons.send,
+                      icon: LucideIcons.upload, // Straight up arrow
                       isActive: false,
                       activeColor: Colors.black,
                       onTap: () {},
-                      topPadding: 2.5,
                     ),
                     const Spacer(),
                     _AnimatedActionIcon(
@@ -226,10 +227,10 @@ class _HomeScreenState extends State<HomeScreen> {
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 12),
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text('${p['likes']} likes', style: const TextStyle(fontWeight: FontWeight.w400)),
+                  Text('${p['likes']} likes', style: const TextStyle(fontWeight: FontWeight.w500)),
                   const SizedBox(height: 4),
                   Text.rich(TextSpan(children: [
-                    TextSpan(text: '@${p['user']} ', style: const TextStyle(fontWeight: FontWeight.w400)),
+                    TextSpan(text: '@${p['user']} ', style: const TextStyle(fontWeight: FontWeight.w500)),
                     TextSpan(text: p['caption']),
                   ])),
                 ]),
@@ -247,7 +248,6 @@ class _AnimatedActionIcon extends StatefulWidget {
   final Color activeColor;
   final IconData? floatIcon;
   final VoidCallback onTap;
-  final double topPadding;
 
   const _AnimatedActionIcon({
     required this.icon,
@@ -255,7 +255,6 @@ class _AnimatedActionIcon extends StatefulWidget {
     required this.activeColor,
     this.floatIcon,
     required this.onTap,
-    this.topPadding = 0.0,
   });
 
   @override
@@ -267,7 +266,7 @@ class _AnimatedActionIconState extends State<_AnimatedActionIcon> {
 
   void _handleTap() {
     widget.onTap();
-    if (widget.isActive) return; 
+    if (widget.isActive) return; // Only animate when turning ON
 
     setState(() => _scale = 1.3);
     Future.delayed(const Duration(milliseconds: 100), () {
@@ -297,6 +296,19 @@ class _AnimatedActionIconState extends State<_AnimatedActionIcon> {
     Future.delayed(const Duration(milliseconds: 1000), () => entry.remove());
   }
 
+  Widget _buildIcon() {
+    if (widget.isActive) {
+      // Filled solid icons for active state
+      if (widget.icon == LucideIcons.heart) {
+        return const Icon(Icons.favorite, size: 28, color: Colors.red);
+      } else if (widget.icon == LucideIcons.bookmark) {
+        return const Icon(Icons.bookmark, size: 28, color: kPrimary);
+      }
+    }
+    // Lucide outline icons for inactive state
+    return SwifsIcon(widget.icon, size: 28, color: Colors.black);
+  }
+
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
@@ -306,18 +318,11 @@ class _AnimatedActionIconState extends State<_AnimatedActionIcon> {
         width: 44,
         height: 44,
         alignment: Alignment.center,
-        child: Padding(
-          padding: EdgeInsets.only(top: widget.topPadding),
-          child: AnimatedScale(
-            scale: _scale,
-            duration: const Duration(milliseconds: 150),
-            curve: Curves.easeOutBack,
-            child: SwifsIcon(
-              widget.icon,
-              size: 28,
-              color: widget.isActive ? widget.activeColor : Colors.black,
-            ),
-          ),
+        child: AnimatedScale(
+          scale: _scale,
+          duration: const Duration(milliseconds: 150),
+          curve: Curves.easeOutBack,
+          child: _buildIcon(),
         ),
       ),
     );
