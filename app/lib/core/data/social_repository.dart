@@ -41,6 +41,8 @@ abstract class SocialRepository {
   Future<dynamic> run(OutboxOp op);
 
   Future<List<NotificationModel>> fetchNotifications();
+  Future<Map<String, dynamic>> fetchUserProfile(String userId);
+  Future<List<FeedPost>> fetchUserPosts(String userId);
   Future<void> blockUser(String userId);
   Future<void> restrictUser(String userId);
 

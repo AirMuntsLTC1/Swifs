@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import '../profile/user_profile_screen.dart';
 import 'package:flutter/services.dart';
 import 'package:lucide_icons_flutter_plus/lucide_icons_flutter_plus.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -352,7 +353,10 @@ class _ThreadScreenState extends State<ThreadScreen> {
         titleSpacing: 0,
         title: Row(
           children: [
-            UserAvatar(url: widget.avatarUrl, name: widget.label, radius: 16),
+            GestureDetector(
+              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => UserProfileScreen(userId: widget.otherId))),
+              child: UserAvatar(url: widget.avatarUrl, name: widget.label, radius: 16),
+            ),
             const SizedBox(width: 10),
             Expanded(
               child: Column(

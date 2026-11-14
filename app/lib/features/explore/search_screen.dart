@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import '../profile/user_profile_screen.dart';
 import '../../core/theme/swifs_icon.dart';
 import 'package:lucide_icons_flutter_plus/lucide_icons_flutter_plus.dart';
 import '../../core/data/social.dart';
@@ -148,10 +149,13 @@ class _SearchScreenState extends State<SearchScreen> {
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           child: Row(
             children: [
-              UserAvatar(
-                url: user['avatar_url']?.toString(),
-                name: display.isNotEmpty ? display : username,
-                radius: 28,
+              GestureDetector(
+                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => UserProfileScreen(userId: user['id'].toString()))),
+                child: UserAvatar(
+                  url: user['avatar_url']?.toString(),
+                  name: display.isNotEmpty ? display : username,
+                  radius: 28,
+                ),
               ),
               const SizedBox(width: 12),
               Expanded(

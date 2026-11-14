@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../profile/user_profile_screen.dart';
 import '../../core/data/models.dart';
 import '../../core/data/social.dart';
 import '../../core/network/interaction_queue.dart';
@@ -331,10 +332,13 @@ class _CommentsSheetState extends State<CommentsSheet> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          UserAvatar(
-            url: c.avatarUrl,
-            name: c.user,
-            radius: isReply ? 11 : 14,
+          GestureDetector(
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => UserProfileScreen(userId: c.authorId))),
+            child: UserAvatar(
+              url: c.avatarUrl,
+              name: c.user,
+              radius: isReply ? 11 : 14,
+            ),
           ),
           const SizedBox(width: 10),
           Expanded(

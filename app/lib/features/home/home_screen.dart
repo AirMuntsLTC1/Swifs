@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../profile/user_profile_screen.dart';
 import 'package:video_player/video_player.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:pull_to_refresh_flutter3/pull_to_refresh_flutter3.dart';
@@ -429,7 +430,10 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    UserAvatar(url: p['avatarUrl']?.toString(), name: (p['displayName'] ?? p['user']).toString(), radius: 18),
+                    GestureDetector(
+                      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => UserProfileScreen(userId: p['authorId'].toString()))),
+                      child: UserAvatar(url: p['avatarUrl']?.toString(), name: (p['displayName'] ?? p['user']).toString(), radius: 18),
+                    ),
                     const SizedBox(width: 8),
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,

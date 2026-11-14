@@ -492,6 +492,52 @@ class SupabaseSocialRepository implements SocialRepository {
       });
 
   // ------------------------------------------------------------------
+  // User Profiles
+  // ------------------------------------------------------------------
+
+  @override
+  Future<Map<String, dynamic>> fetchUserProfile(String userId) => _guard(() async {
+        final me = _me;
+        
+        // 1. Get profile data
+        final row = await _db
+            .from('profiles')
+            .select('id, username, display_name, avatar_url, followers_count, following_count, bio')
+            .eq('id', userId)
+            .maybeSingle();
+        
+        if (row == null) throw const DataException('User not found');
+        
+        // 2. Get post count
+        final postCount = (await _db.from('posts').select('id').eq('author_id', userId)).length;
+        
+        // 3. Check relationships
+        final iFollow = await _db.from('follows').select('followee').eq('follower', me).eq('followee', userId);
+        final followsMe = await _db.from('follows').select('follower').eq('followee', me).eq('follower', userId);
+
+        final profile = Map<String, dynamic>.from(row);
+        profile['posts_count'] = postCount;
+        profile['isFollowing'] = iFollow.isNotEmpty;
+        profile['followsMe'] = followsMe.isNotEmpty;
+        
+        return profile;
+      });
+
+  @override
+  Future<List<FeedPost>> fetchUserPosts(String userId) => _guard(() async {
+        final rows = await _db
+            .from('posts')
+            .select('id, author_id, text, likes, created_at, post_media(kind, storage_path, thumb_path, position)')
+            .eq('author_id', userId)
+            .order('created_at', ascending: false)
+            .limit(60);
+        final list = await _hydrate(rows.map((e) => Map<String, dynamic>.from(e)).toList());
+        // Use C++ core to rank them
+        list.sort((a, b) => b.score.compareTo(a.score));
+        return list;
+      });
+
+  // ------------------------------------------------------------------
   // Notifications
   // ------------------------------------------------------------------
 

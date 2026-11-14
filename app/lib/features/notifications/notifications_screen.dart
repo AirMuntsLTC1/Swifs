@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../profile/user_profile_screen.dart';
 import 'package:lucide_icons_flutter_plus/lucide_icons_flutter_plus.dart';
 import '../../core/data/models.dart';
 import '../../core/data/social.dart';
@@ -101,7 +102,10 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                       leading: GestureDetector(
                         onTap: () => _showSafetyNotice(item),
-                        child: UserAvatar(url: item.actorAvatarUrl, name: item.actorUsername, radius: 26),
+                        child: GestureDetector(
+                          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => UserProfileScreen(userId: item.actorId))),
+                          child: UserAvatar(url: item.actorAvatarUrl, name: item.actorUsername, radius: 26),
+                        ),
                       ),
                       title: RichText(
                         text: TextSpan(
