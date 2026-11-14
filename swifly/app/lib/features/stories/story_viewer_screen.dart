@@ -107,7 +107,7 @@ class _StoryViewerScreenState extends State<StoryViewerScreen> with SingleTicker
     _reply.clear();
     FocusScope.of(context).unfocus();
     try {
-      await StoriesRepository.instance.reply(storyId, text);
+      await StoriesRepository.instance.reply(storyId, _group.authorId, text);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Reply sent')));
       }

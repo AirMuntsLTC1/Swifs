@@ -201,10 +201,19 @@ class StoriesRepository {
     await _db.from('story_reactions').insert({'story_id': storyId, 'user_id': me, 'emoji': emoji});
   }
 
-  Future<void> reply(String storyId, String text) async {
+  /// Saves the reply on the story, and sends it to the owner's Messages with the story attached.
+  Future<void> reply(String storyId, String ownerId, String text) async {
     final me = _meOrNull;
     if (me == null) throw StateError('Please sign in.');
     await _db.from('story_replies').insert({'story_id': storyId, 'user_id': me, 'text': text});
+    if (ownerId != me) {
+      await _db.from('messages').insert({
+        'sender': me,
+        'recipient': ownerId,
+        'text': text,
+        'story_id': storyId,
+      });
+    }
   }
 
   /// Starts sharing in the background. Returns at once so the screen can close and the ring can fill.
