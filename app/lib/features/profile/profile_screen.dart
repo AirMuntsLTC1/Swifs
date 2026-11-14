@@ -3,6 +3,7 @@ import 'package:pull_to_refresh_flutter3/pull_to_refresh_flutter3.dart';
 import '../../core/theme/swifs_refresh.dart';
 import '../../core/theme/swifs_icon.dart';
 import 'package:lucide_icons_flutter_plus/lucide_icons_flutter_plus.dart';
+import 'settings_screen.dart';
 
 const Color kPrimary = Color(0xFFFF6B35);
 
@@ -97,7 +98,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           ),
                           const SizedBox(width: 8),
                           GestureDetector(
-                            onTap: () {},
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                PageRouteBuilder(
+                                  pageBuilder: (context, animation, secondaryAnimation) => const SettingsScreen(),
+                                  transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                                    const begin = Offset(1.0, 0.0); // Slide from right
+                                    const end = Offset.zero;
+                                    const curve = Curves.easeOutCubic;
+                                    var tween = Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
+                                    return SlideTransition(position: animation.drive(tween), child: child);
+                                  },
+                                ),
+                              );
+                            },
                             child: Container(
                               width: 44,
                               height: 44,
