@@ -19,6 +19,7 @@ import '../../core/network/interaction_queue.dart';
 import '../comments/comments_sheet.dart';
 import '../create/create_post_screen.dart';
 import '../notifications/notifications_screen.dart';
+import '../../core/widgets/count_text.dart';
 import '../../core/native/swifs_ffi.dart';
 import '../../core/notifications/realtime_notification_service.dart';
 import '../../core/widgets/swifs_skeleton.dart';
@@ -221,6 +222,7 @@ class _HomeScreenState extends State<HomeScreen> {
           if (f == null) continue;
           post['likes'] = f['likes'];
           post['comments'] = f['comments'];
+          post['shares'] = f['shares'];
           post['views'] = f['views'];
           post['user'] = f['user'];
           post['displayName'] = f['displayName'];
@@ -582,12 +584,20 @@ class _HomeScreenState extends State<HomeScreen> {
                       floatIcon: LucideIcons.heart,
                       onTap: () => _handleLike(i),
                     ),
+                    Padding(
+                      padding: const EdgeInsets.only(left: 2, right: 10),
+                      child: Text(compactCount((p['likes'] ?? 0) as num), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                    ),
                     const SizedBox(width: 4),
                     _AnimatedActionIcon(
                       icon: LucideIcons.messageCircle,
                       isActive: false,
                       activeColor: Colors.black,
                       onTap: () => _openComments(p['id']),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.only(left: 2, right: 10),
+                      child: Text(compactCount((p['comments'] ?? 0) as num), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
                     ),
                     const SizedBox(width: 4),
                     _AnimatedActionIcon(
@@ -600,8 +610,12 @@ class _HomeScreenState extends State<HomeScreen> {
                           isScrollControlled: true,
                           backgroundColor: Colors.transparent,
                           builder: (_) => ShareBottomSheet(postId: p['id']),
-                        );
+                        ).then((_) => _refreshCounts());
                       },
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.only(left: 2, right: 10),
+                      child: Text(compactCount((p['shares'] ?? 0) as num), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
                     ),
                     const Spacer(),
                     _AnimatedActionIcon(

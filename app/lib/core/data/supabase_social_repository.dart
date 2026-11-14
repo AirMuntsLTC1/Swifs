@@ -235,6 +235,31 @@ class SupabaseSocialRepository implements SocialRepository {
       });
 
   @override
+  Future<Map<String, Map<String, int>>> fetchPostCounts(List<String> postIds) => _guard(() async {
+        if (postIds.isEmpty) return <String, Map<String, int>>{};
+        final rows = await _db.rpc('post_counts', params: {'p_post_ids': postIds});
+        final out = <String, Map<String, int>>{};
+        for (final r in (rows as List)) {
+          final m = Map<String, dynamic>.from(r as Map);
+          out[m['post_id'].toString()] = {
+            'likes': (m['likes'] as num?)?.toInt() ?? 0,
+            'comments': (m['comments'] as num?)?.toInt() ?? 0,
+            'shares': (m['shares'] as num?)?.toInt() ?? 0,
+          };
+        }
+        return out;
+      });
+
+  /// Feed counts must still load if the count call fails: fall back to the stored values.
+  Future<Map<String, Map<String, int>>> _countsOrEmpty(List<String> postIds) async {
+    try {
+      return await fetchPostCounts(postIds);
+    } catch (_) {
+      return <String, Map<String, int>>{};
+    }
+  }
+
+  @override
   Future<Map<String, dynamic>?> cachedMyProfile() async {
     final raw = await _cache.read('cache.myprofile');
     return raw is Map ? Map<String, dynamic>.from(raw) : null;
@@ -324,16 +349,11 @@ class SupabaseSocialRepository implements SocialRepository {
     final authorIds = posts.map((p) => p['author_id'].toString()).toSet().toList();
 
     final profiles = await _profilesFor(authorIds);
-    final commentRows = await _db.from('comments').select('post_id').inFilter('post_id', postIds);
+    final counts = await _countsOrEmpty(postIds);
     final likeRows = await _db.from('post_likes').select('post_id').eq('user_id', me).inFilter('post_id', postIds);
     final saveRows = await _db.from('post_saves').select('post_id').eq('user_id', me).inFilter('post_id', postIds);
     final followRows = await _db.from('follows').select('followee').eq('follower', me);
 
-    final commentCounts = <String, int>{};
-    for (final r in commentRows) {
-      final k = r['post_id'].toString();
-      commentCounts[k] = (commentCounts[k] ?? 0) + 1;
-    }
     final liked = {for (final r in likeRows) r['post_id'].toString()};
     final saved = {for (final r in saveRows) r['post_id'].toString()};
     final following = {for (final r in followRows) r['followee'].toString()};
@@ -382,8 +402,9 @@ class SupabaseSocialRepository implements SocialRepository {
         thumbUrl: thumbUrl,
         views: (p['views'] as num?)?.toInt() ?? 0,
         ageMinutes: _ageMinutes(p['created_at']),
-        likes: (p['likes'] as num?)?.toInt() ?? 0,
-        comments: commentCounts[pid] ?? 0,
+        likes: counts[pid]?['likes'] ?? (p['likes'] as num?)?.toInt() ?? 0,
+        comments: counts[pid]?['comments'] ?? 0,
+        shares: counts[pid]?['shares'] ?? 0,
         liked: liked.contains(pid),
         isSaved: saved.contains(pid),
         isFollowing: following.contains(aid),

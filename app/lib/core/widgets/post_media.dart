@@ -8,6 +8,7 @@ import '../data/social.dart';
 import '../network/interaction_queue.dart';
 import '../theme/swifs_icon.dart';
 import 'swifs_skeleton.dart';
+import 'count_text.dart';
 import '../../features/messages/share_bottom_sheet.dart';
 import '../widgets/user_avatar.dart';
 import '../../features/comments/comments_sheet.dart';
@@ -338,6 +339,7 @@ class _PostViewerScreenState extends State<PostViewerScreen> {
   late int _likes;
   late bool _saved;
   late int _comments;
+  late int _shares;
   List<Map<String, dynamic>> _media = const [];
   bool _loadingMedia = false;
 
@@ -348,6 +350,7 @@ class _PostViewerScreenState extends State<PostViewerScreen> {
     _likes = widget.post.likes;
     _saved = widget.post.isSaved;
     _comments = widget.post.comments;
+    _shares = widget.post.shares;
     if (widget.post.media.isNotEmpty) {
       _media = widget.post.media;
     } else {
@@ -364,6 +367,22 @@ class _PostViewerScreenState extends State<PostViewerScreen> {
       // Keep whatever is shown. The post still opens.
     } finally {
       if (mounted) setState(() => _loadingMedia = false);
+    }
+  }
+
+  /// Re-reads likes, comments and shares from the server after a sheet closes.
+  Future<void> _refreshCounts() async {
+    try {
+      final counts = await social.fetchPostCounts([widget.post.id]);
+      final c = counts[widget.post.id];
+      if (c == null || !mounted) return;
+      setState(() {
+        _likes = c['likes'] ?? _likes;
+        _comments = c['comments'] ?? _comments;
+        _shares = c['shares'] ?? _shares;
+      });
+    } catch (_) {
+      // Keep the numbers on screen.
     }
   }
 
@@ -439,9 +458,20 @@ class _PostViewerScreenState extends State<PostViewerScreen> {
                       ? const Icon(Icons.favorite, size: 28, color: Colors.red)
                       : const SwifsIcon(LucideIcons.heart, size: 28, color: _kInk),
                 ),
+                Padding(
+                  padding: const EdgeInsets.only(left: 2, right: 10),
+                  child: Text(compactCount(_likes), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: _kInk)),
+                ),
                 _ActionButton(
-                  onTap: () => showCommentsSheet(context, postId: widget.post.id),
+                  onTap: () async {
+                    await showCommentsSheet(context, postId: widget.post.id);
+                    _refreshCounts();
+                  },
                   child: const SwifsIcon(LucideIcons.messageCircle, size: 28, color: _kInk),
+                ),
+                Padding(
+                  padding: const EdgeInsets.only(left: 2, right: 10),
+                  child: Text(compactCount(_comments), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: _kInk)),
                 ),
                 _ActionButton(
                   onTap: () => showModalBottomSheet(
@@ -449,8 +479,12 @@ class _PostViewerScreenState extends State<PostViewerScreen> {
                     isScrollControlled: true,
                     backgroundColor: Colors.transparent,
                     builder: (_) => ShareBottomSheet(postId: widget.post.id),
-                  ),
+                  ).then((_) => _refreshCounts()),
                   child: const SwifsIcon(LucideIcons.upload, size: 28, color: _kInk),
+                ),
+                Padding(
+                  padding: const EdgeInsets.only(left: 2, right: 10),
+                  child: Text(compactCount(_shares), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: _kInk)),
                 ),
                 const Spacer(),
                 _ActionButton(

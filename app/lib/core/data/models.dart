@@ -63,6 +63,7 @@ class FeedPost {
   final int ageMinutes;
   int likes;
   int comments;
+  int shares;
   bool liked;
   bool isSaved;
   bool isFollowing;
@@ -83,6 +84,7 @@ class FeedPost {
     required this.ageMinutes,
     required this.likes,
     required this.comments,
+    this.shares = 0,
     required this.liked,
     required this.isSaved,
     required this.isFollowing,
@@ -109,6 +111,7 @@ class FeedPost {
         'age_minutes': ageMinutes,
         'likes': likes,
         'comments': comments,
+        'shares': shares,
         'liked': liked,
         'isSaved': isSaved,
         'isFollowing': isFollowing,
@@ -131,6 +134,7 @@ class FeedPost {
         ageMinutes: (m['age_minutes'] as num?)?.toInt() ?? 0,
         likes: (m['likes'] as num?)?.toInt() ?? 0,
         comments: (m['comments'] as num?)?.toInt() ?? 0,
+        shares: (m['shares'] as num?)?.toInt() ?? 0,
         liked: m['liked'] == true,
         isSaved: m['isSaved'] == true,
         isFollowing: m['isFollowing'] == true,

@@ -55,6 +55,7 @@ abstract class SocialRepository {
   // Profile
   Future<Map<String, dynamic>> updateMyProfile({String? displayName, String? bio});
   Future<String> uploadMyAvatar(File file);
+  Future<Map<String, Map<String, int>>> fetchPostCounts(List<String> postIds);
   Future<void> restrictUser(String userId);
 
 }
