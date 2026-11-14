@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' show NoSplash;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/theme/swifs_icon.dart';
 import 'package:lucide_icons_flutter_plus/lucide_icons_flutter_plus.dart';
@@ -25,6 +26,9 @@ class SwifsApp extends StatelessWidget {
         scaffoldBackgroundColor: Colors.white,
         useMaterial3: true,
         colorSchemeSeed: kPrimary,
+        splashFactory: NoSplash.splashFactory,
+        highlightColor: Colors.transparent,
+        splashColor: Colors.transparent,
       ),
       home: const MainShell(),
     );

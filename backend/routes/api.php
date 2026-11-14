@@ -35,3 +35,18 @@ $router->get('/api/notifications', function () {
 $router->get('/api/profile', function () {
     echo json_encode(require __DIR__ . '/../mocks/profile.php');
 });
+$router->post('/api/like', function () {
+    $input = json_decode(file_get_contents('php://input'), true);
+    // Later: INSERT INTO likes (user_id, post_id) VALUES (...)
+    echo json_encode(['status' => 'success', 'action' => 'like', 'post_id' => $input['post_id'] ?? null, 'score' => $input['score'] ?? 0]);
+});
+
+$router->post('/api/save', function () {
+    $input = json_decode(file_get_contents('php://input'), true);
+    echo json_encode(['status' => 'success', 'action' => 'save', 'post_id' => $input['post_id'] ?? null]);
+});
+
+$router->post('/api/follow', function () {
+    $input = json_decode(file_get_contents('php://input'), true);
+    echo json_encode(['status' => 'success', 'action' => 'follow', 'username' => $input['username'] ?? null]);
+});
