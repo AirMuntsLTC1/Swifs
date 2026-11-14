@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter_plus/lucide_icons_flutter_plus.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../main.dart';
 import '../../core/data/models.dart';
 import '../../core/data/social.dart';
 import '../../core/theme/swifs_icon.dart';
@@ -27,10 +29,25 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
   bool _isFollowing = false;
   bool _followsMe = false;
 
+  /// True when this profile is the signed-in user's own.
+  bool get _isMe => Supabase.instance.client.auth.currentUser?.id == widget.userId;
+
   @override
   void initState() {
     super.initState();
+    if (_isMe) {
+      // Your own profile is the Profile tab, not a visitor's page with Follow and Message.
+      WidgetsBinding.instance.addPostFrameCallback((_) => _goToMyProfile());
+      return;
+    }
     _load();
+  }
+
+  /// Returns to the main screens and slides to the Profile tab.
+  void _goToMyProfile() {
+    if (!mounted) return;
+    Navigator.of(context).popUntil((route) => route.isFirst);
+    MainShell.requestedTab.value = 3;
   }
 
   Future<void> _load() async {

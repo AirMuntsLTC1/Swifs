@@ -59,6 +59,11 @@ class SwifsApp extends StatelessWidget {
 
 class MainShell extends StatefulWidget {
   const MainShell({super.key});
+
+  /// Any screen can ask the main shell to slide to a tab (0 Home, 1 Find, 2 Messages, 3 Profile).
+  /// Set it to the tab index; the shell moves there and clears it.
+  static final ValueNotifier<int?> requestedTab = ValueNotifier<int?>(null);
+
   @override
   State<MainShell> createState() => _MainShellState();
 }
@@ -78,12 +83,21 @@ class _MainShellState extends State<MainShell> {
   void initState() {
     super.initState();
     _pageController = PageController(initialPage: _index);
+    MainShell.requestedTab.addListener(_onRequestedTab);
   }
 
   @override
   void dispose() {
+    MainShell.requestedTab.removeListener(_onRequestedTab);
     _pageController.dispose();
     super.dispose();
+  }
+
+  void _onRequestedTab() {
+    final tab = MainShell.requestedTab.value;
+    if (tab == null) return;
+    MainShell.requestedTab.value = null;
+    _onTabTapped(tab);
   }
 
   void _onTabTapped(int index) {
