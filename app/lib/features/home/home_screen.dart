@@ -220,7 +220,7 @@ class _HomeScreenState extends State<HomeScreen> {
           children: [
             const Text('Swifs', style: TextStyle(fontSize: 26, fontWeight: FontWeight.w600, color: kPrimary)),
             Row(children: [
-              IconButton(icon: const SwifsIcon(LucideIcons.search), onPressed: () {}),
+              IconButton(icon: const SwifsIcon(LucideIcons.plus), onPressed: () {}),
               IconButton(icon: const SwifsIcon(LucideIcons.bell), onPressed: () {}),
             ]),
           ],
