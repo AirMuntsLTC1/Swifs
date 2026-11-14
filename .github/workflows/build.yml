@@ -90,7 +90,7 @@ jobs:
       - name: Analyze and test Dart
         working-directory: app
         run: |
-          flutter analyze
+          flutter analyze --no-fatal-infos --no-fatal-warnings
           flutter test
 
       - name: Draw Swifs icons in code

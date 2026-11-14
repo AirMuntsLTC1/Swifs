@@ -768,7 +768,6 @@ class SupabaseSocialRepository implements SocialRepository {
   // Create post: original file plus a small thumbnail, so feeds show instantly
   // ------------------------------------------------------------------
 
-  static const _videoExts = {'mp4', 'mov', 'm4v', 'webm', 'mkv'};
 
   String _mime(String ext) {
     switch (ext) {

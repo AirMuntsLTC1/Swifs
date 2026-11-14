@@ -2,12 +2,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import '../messages/share_bottom_sheet.dart';
 import '../profile/user_profile_screen.dart';
-import 'package:video_player/video_player.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:pull_to_refresh_flutter3/pull_to_refresh_flutter3.dart';
 import '../../core/theme/swifs_refresh.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
 import 'package:audioplayers/audioplayers.dart';
 import '../../core/theme/swifs_icon.dart';
 import 'package:lucide_icons_flutter_plus/lucide_icons_flutter_plus.dart';
@@ -446,7 +442,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _myStoryItem(double? uploading) {
     final mine = _mine;
-    final hasStory = mine != null;
     final avatar = SizedBox(
       width: 68,
       height: 68,

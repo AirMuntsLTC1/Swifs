@@ -1,5 +1,4 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'models.dart';
 
 class DirectMessage {
   final String id;
