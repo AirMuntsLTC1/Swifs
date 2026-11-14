@@ -48,3 +48,6 @@ flutter_native_splash:
   android_12:
     color: "#FF5733"
     image: assets/splash_plane.png
+
+dependency_overrides:
+  app_links: 6.3.2
