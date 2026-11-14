@@ -8,6 +8,7 @@ import '../../core/data/models.dart';
 import '../../core/data/social.dart';
 import '../../core/theme/swifs_icon.dart';
 import '../../core/widgets/user_avatar.dart';
+import '../../core/widgets/swifs_skeleton.dart';
 import '../messages/thread_screen.dart';
 
 const Color kPrimary = Color(0xFFFF6B35);
@@ -113,7 +114,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         title: const Text('Notifications', style: TextStyle(color: kInk, fontSize: 18, fontWeight: FontWeight.w600)),
       ),
       body: _loading
-          ? const Center(child: CircularProgressIndicator(color: kPrimary))
+          ? const ListRowsSkeleton()
           : _items.isEmpty
               ? const Center(child: Text('No notifications yet', style: TextStyle(color: kMuted)))
               : ListView.separated(
@@ -280,3 +281,5 @@ class _ActionSheet extends StatelessWidget {
     );
   }
 }
+
+

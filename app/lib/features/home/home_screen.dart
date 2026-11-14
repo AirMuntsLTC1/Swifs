@@ -9,7 +9,9 @@ import '../../core/theme/swifs_icon.dart';
 import 'package:lucide_icons_flutter_plus/lucide_icons_flutter_plus.dart';
 import '../../core/data/models.dart';
 import '../../core/data/social.dart';
+import 'package:flutter/services.dart';
 import '../../core/widgets/post_media.dart';
+import '../../core/widgets/double_tap_like.dart';
 import '../../core/widgets/user_avatar.dart';
 import '../../core/widgets/story_ring.dart';
 import '../../core/data/stories_repository.dart';
@@ -261,7 +263,10 @@ class _HomeScreenState extends State<HomeScreen> {
     final prevLikes = (post['likes'] as num).toInt();
     final prevScore = post['score'];
     final nowLiked = !wasLiked;
-    if (nowLiked) _playPopSound();
+    if (nowLiked) {
+      HapticFeedback.lightImpact();
+      _playPopSound();
+    }
 
     setState(() {
       post['liked'] = nowLiked;
@@ -575,9 +580,13 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               SizedBox(
                 width: double.infinity,
-                child: PostCarousel(
-                  media: _mediaOf(p),
-                  ratio: postAspectRatio(_mediaOf(p).isEmpty ? null : _mediaOf(p).first),
+                child: DoubleTapLike(
+                  alreadyLiked: p['liked'] == true,
+                  onLike: () => _handleLike(i),
+                  child: PostCarousel(
+                    media: _mediaOf(p),
+                    ratio: postAspectRatio(_mediaOf(p).isEmpty ? null : _mediaOf(p).first),
+                  ),
                 ),
               ),
               Padding(
@@ -827,3 +836,5 @@ extension _EmptyFeedBuilder on _HomeScreenState {
     );
   }
 }
+
+

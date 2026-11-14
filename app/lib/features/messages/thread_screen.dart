@@ -565,7 +565,10 @@ class _ThreadScreenState extends State<ThreadScreen> {
     );
 
     return GestureDetector(
-      onLongPress: () => _openMenu(m),
+      onLongPress: () {
+        HapticFeedback.mediumImpact();
+        _openMenu(m);
+      },
       onTap: m.failed ? () => _retry(m) : null,
       child: Align(
         alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
@@ -913,3 +916,5 @@ class _AppearAnimationState extends State<_AppearAnimation> with SingleTickerPro
     );
   }
 }
+
+
