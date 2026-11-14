@@ -81,6 +81,13 @@ jobs:
         working-directory: app
         run: flutter pub get
 
+      # 6. Quality gate: broken Dart never reaches the APK
+      - name: Analyze and test Dart
+        working-directory: app
+        run: |
+          flutter analyze
+          flutter test
+
       - name: Draw Swifs icons in code
         run: |
           sudo apt-get update && sudo apt-get install -y python3-pil
@@ -108,5 +115,3 @@ jobs:
         with:
           name: swifs-arm64-release
           path: app/build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
-
-
