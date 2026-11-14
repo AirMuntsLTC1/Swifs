@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:audioplayers/audioplayers.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:audioplayers/audioplayers.dart';
 import '../../core/theme/swifs_icon.dart';
 import 'package:lucide_icons_flutter_plus/lucide_icons_flutter_plus.dart';
 import '../../core/mocks/mock_feed.dart';
@@ -23,13 +23,21 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    _audioPlayer.setPlayerMode(PlayerMode.lowLatency);
-    _audioPlayer.setSource(AssetSource('sounds/bubble_pop.mp3'));
     _posts = mockPosts.map((p) => {
       ...p, 
       'isFollowing': false,
       'isSaved': false,
     }).toList();
+
+    // Preload audio for low latency
+    _audioPlayer.setPlayerMode(PlayerMode.lowLatency);
+    _audioPlayer.setSource(AssetSource('sounds/bubble_pop.mp3'));
+  }
+
+  @override
+  void dispose() {
+    _audioPlayer.dispose();
+    super.dispose();
   }
 
   void _playPopSound() async {
@@ -44,16 +52,15 @@ class _HomeScreenState extends State<HomeScreen> {
   void _handleLike(int index) {
     final p = _posts[index];
     final newLikedState = !p['liked'];
-    if (newLikedState) _playPopSound();
     final newLikesCount = newLikedState ? p['likes'] + 1 : p['likes'] - 1;
 
-    // Try-catch prevents crash if C++ isn't compiled in Gradle yet
+    if (newLikedState) _playPopSound();
+
     int newScore = 0;
     try {
       newScore = SwifsCore.feedScore(newLikesCount, p['comments'], p['views'], p['age_minutes']);
-      print('C++ Calculated New Score: $newScore');
     } catch (e) {
-      print('C++ FFI not loaded yet: $e');
+      print('C++ FFI not loaded: $e');
     }
 
     setState(() {
@@ -67,6 +74,7 @@ class _HomeScreenState extends State<HomeScreen> {
   void _handleSave(int index) {
     final p = _posts[index];
     if (!p['isSaved']) _playPopSound();
+    
     setState(() => p['isSaved'] = !p['isSaved']);
     _sendToApi('/save', {'post_id': p['id']});
   }
@@ -79,7 +87,7 @@ class _HomeScreenState extends State<HomeScreen> {
     try {
       userHash = SwifsCore.hashUser(p['user']);
     } catch (e) {
-      print('C++ FFI not loaded yet: $e');
+      print('C++ FFI not loaded: $e');
     }
     
     _sendToApi('/follow', {'username': p['user'], 'user_hash': userHash});
@@ -87,21 +95,14 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _sendToApi(String endpoint, Map<String, dynamic> body) async {
     try {
-      final response = await http.post(
+      await http.post(
         Uri.parse('$apiUrl$endpoint'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode(body),
       );
-      print('PHP API Response: ${response.body}');
     } catch (e) {
-      print('PHP API Error: $e');
+      // Ignore silently in UI if server is offline
     }
-  }
-
-  @override
-  void dispose() {
-    _audioPlayer.dispose();
-    super.dispose();
   }
 
   @override
@@ -229,7 +230,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                     const SizedBox(width: 4),
                     _AnimatedActionIcon(
-                      icon: LucideIcons.upload, // Straight up arrow
+                      icon: LucideIcons.upload,
                       isActive: false,
                       activeColor: Colors.black,
                       onTap: () {},
@@ -287,7 +288,7 @@ class _AnimatedActionIconState extends State<_AnimatedActionIcon> {
 
   void _handleTap() {
     widget.onTap();
-    if (widget.isActive) return; // Only animate when turning ON
+    if (widget.isActive) return; 
 
     setState(() => _scale = 1.3);
     Future.delayed(const Duration(milliseconds: 100), () {
@@ -319,21 +320,13 @@ class _AnimatedActionIconState extends State<_AnimatedActionIcon> {
 
   Widget _buildIcon() {
     if (widget.isActive) {
-      // Filled solid icons for active state
       if (widget.icon == LucideIcons.heart) {
         return const Icon(Icons.favorite, size: 28, color: Colors.red);
       } else if (widget.icon == LucideIcons.bookmark) {
         return const Icon(Icons.bookmark, size: 28, color: kPrimary);
       }
     }
-    // Lucide outline icons for inactive state
     return SwifsIcon(widget.icon, size: 28, color: Colors.black);
-  }
-
-  @override
-  void dispose() {
-    _audioPlayer.dispose();
-    super.dispose();
   }
 
   @override
@@ -385,12 +378,6 @@ class _FloatingHeartsState extends State<_FloatingHearts> with SingleTickerProvi
   @override
   void dispose() {
     _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  void dispose() {
-    _audioPlayer.dispose();
     super.dispose();
   }
 
