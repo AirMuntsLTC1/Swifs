@@ -4,6 +4,7 @@ import '../../core/theme/swifs_refresh.dart';
 import '../../core/theme/swifs_icon.dart';
 import 'package:lucide_icons_flutter_plus/lucide_icons_flutter_plus.dart';
 import '../../core/mocks/mock_explore.dart';
+import 'search_screen.dart';
 
 const Color kPrimary = Color(0xFFFF6B35);
 
@@ -40,15 +41,35 @@ class _ExploreScreenState extends State<ExploreScreen> {
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                child: TextField(
-                  decoration: InputDecoration(
-                    hintText: 'Search Swifs',
-                    prefixIcon: const SwifsIcon(LucideIcons.search),
-                    filled: true,
-                    fillColor: Colors.grey.shade100,
-                    border: OutlineInputBorder(
+                child: GestureDetector(
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      PageRouteBuilder(
+                        pageBuilder: (context, animation, secondaryAnimation) => const SearchScreen(),
+                        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                          const begin = Offset(0.0, 1.0);
+                          const end = Offset.zero;
+                          const curve = Curves.easeOutCubic;
+                          var tween = Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
+                          return SlideTransition(position: animation.drive(tween), child: child);
+                        },
+                      ),
+                    );
+                  },
+                  child: Container(
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade100,
                       borderRadius: BorderRadius.circular(14),
-                      borderSide: BorderSide.none,
+                    ),
+                    child: Row(
+                      children: [
+                        const SizedBox(width: 14),
+                        const SwifsIcon(LucideIcons.search, size: 18, color: Colors.grey),
+                        const SizedBox(width: 10),
+                        const Text('Search Swifs', style: TextStyle(color: Colors.grey, fontSize: 15)),
+                      ],
                     ),
                   ),
                 ),
