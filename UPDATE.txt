@@ -1,14 +1,62 @@
-SWIFS COMMENTS SHEET UPDATE
+SWIFS: SUPABASE-READY DATA LAYER (PHP REMOVED)
 
-In Termux (install python once with: pkg install python):
+WHAT CHANGED
+  - The PHP backend and its Termux steps are gone.
+  - Every screen now reads and writes through one data layer:
+      app/lib/core/data/social.dart
+  - Right now the app runs on built-in sample data, so you can keep designing.
+  - When you connect Supabase, one line switches it over.
+  - Likes, saves, follows and comments work the same as before:
+    instant on screen, sent in the background, undone if the server rejects them.
+  - Scores come from the C++ core.
+
+STEP 1: INSTALL NOW (Termux)
   cd ~/swifs
-  unzip -o ~/comments-update.zip
-  python3 scripts/apply_comments.py
+  unzip -o ~/supabase-ready-update.zip
+  python3 scripts/apply_data_layer.py
+  git rm -r -q --ignore-unmatch backend tests/parity scripts/apply_backend.py
   git add -A
-  git commit -m "Comments sheet with replies and heart animation"
+  git commit -m "Supabase-ready data layer; remove PHP backend"
   git push
 
-Adds:
-  app/lib/core/widgets/pop_heart.dart        heart animation + pop sound (same as feed)
-  app/lib/features/comments/comments_sheet.dart   comments sheet
-  scripts/apply_comments.py                  connects the comment icon in the feed
+  apply_data_layer.py changes only the data code in home_screen.dart.
+  Your layout and design stay as they are.
+
+STEP 2: CONNECT SUPABASE (later, when the design is ready)
+  a. supabase.com > New project.
+     Settings > API: copy the Project URL and the anon public key.
+  b. SQL Editor > New query > paste supabase/schema.sql > Run.
+  c. Paste the URL and anon key into:
+       app/lib/core/config/supabase_config.dart
+  d. cd ~/swifs/app
+     flutter pub add supabase_flutter
+  e. In app/lib/main.dart, replace main() with:
+
+       import 'package:supabase_flutter/supabase_flutter.dart';
+       import 'core/config/supabase_config.dart';
+
+       Future<void> main() async {
+         WidgetsFlutterBinding.ensureInitialized();
+         await Supabase.initialize(url: kSupabaseUrl, anonKey: kSupabaseAnonKey);
+         runApp(const ProviderScope(child: SwifsApp()));
+       }
+
+  f. In app/lib/core/data/social.dart:
+       - uncomment:  // import 'supabase_social_repository.dart';
+       - in createSocialRepository(), return SupabaseSocialRepository()
+         instead of MockSocialRepository().
+  g. Commit and push.
+
+IMPORTANT
+  - Likes, saves, follows and comments need a signed-in user, because the
+    security rules use auth.uid(). The app has no sign-in screen yet. Add
+    Supabase Auth (email and password, for example) before testing writes.
+    Sign-up can pass { "username": "..." } so the profile gets that name.
+  - Never put the service_role key in the app. Only the anon key.
+  - Until step 2d runs, "flutter analyze" reports supabase_social_repository.dart
+    because the package is not installed yet. The app build is not affected.
+
+KNOWN LIMITS
+  - Pending actions wait in memory. If the app closes while offline, they are lost.
+  - The feed is ranked on the phone with the C++ core, not on the server.
+  - The feed loads the 50 newest posts.

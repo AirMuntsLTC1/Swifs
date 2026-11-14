@@ -12,20 +12,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # 1. PHP Backend Lint
-      - name: Setup PHP
-        uses: shivammathur/setup-php@v2
-        with:
-          php-version: '8.2'
-          tools: composer
-
-      - name: Install PHP dependencies
-        working-directory: backend
-        run: composer install --no-interaction --prefer-dist
-
-      - name: Lint PHP
-        working-directory: backend
-        run: find src public routes config -name "*.php" -exec php -l {} \;
+      # 1. C++ core checks (no backend needed)
+      - name: Native core checks
+        run: bash tests/native/check.sh
 
       # 2. Flutter Android Build Setup
       - uses: actions/setup-java@v4
@@ -64,20 +53,23 @@ jobs:
           mv /tmp/swifs_lib app/lib
           cp /tmp/swifs_pubspec.yaml app/pubspec.yaml
 
-      # 4. Inject Native Code
+      # 4. Inject Native Code (C++ core + Kotlin bridge)
       - name: Inject Native Code
         run: |
           mkdir -p app/android/app/src/main/kotlin/com/swifs/native
           mkdir -p app/android/app/src/main/cpp
           cp android-native/bridge/src/main/kotlin/com/swifs/native/*.kt app/android/app/src/main/kotlin/com/swifs/native/ 2>/dev/null || true
-          cp app/native/src/swifs_core.cpp app/android/app/src/main/cpp/ 2>/dev/null || true
-          cp app/native/include/swifs_core.h app/android/app/src/main/cpp/ 2>/dev/null || true
-          cp app/native/CMakeLists.txt app/android/app/src/main/cpp/CMakeLists.txt 2>/dev/null || true
+          cp -r app/native/src app/native/include app/android/app/src/main/cpp/
+          cp app/native/CMakeLists.txt app/android/app/src/main/cpp/CMakeLists.txt
 
       # 5. Run Python Optimizer
       - name: Apply Size Optimizations
         working-directory: app
         run: python3 ../scripts/optimize_build.py
+
+      - name: Wire C++ core and internet into Android build
+        working-directory: app
+        run: python3 ../scripts/wire_native.py
 
       - name: Flutter pub get
         working-directory: app

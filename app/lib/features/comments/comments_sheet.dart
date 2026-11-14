@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import '../../core/data/models.dart';
+import '../../core/data/social.dart';
+import '../../core/network/interaction_queue.dart';
 import '../../core/widgets/pop_heart.dart';
 
 const Color kPrimary = Color(0xFFFF6B35);
@@ -7,7 +10,7 @@ const Color kMuted = Color(0xFF8E8E93);
 const Color kLine = Color(0xFFEFEFEF);
 const List<String> kReactions = ['❤️', '🙌', '🔥', '👏', '😢', '😍', '😮', '😂'];
 
-/// Slides the comments sheet up from the bottom.
+/// Slides the comments sheet up. Completes when it closes.
 Future<void> showCommentsSheet(BuildContext context, {required String postId}) {
   return showModalBottomSheet<void>(
     context: context,
@@ -16,52 +19,6 @@ Future<void> showCommentsSheet(BuildContext context, {required String postId}) {
     builder: (_) => CommentsSheet(postId: postId),
   );
 }
-
-class CommentItem {
-  final String id;
-  final String user;
-  final String text;
-  final String time;
-  int likes;
-  bool liked = false;
-  bool showReplies = false;
-  final List<CommentItem> replies;
-
-  CommentItem({
-    required this.id,
-    required this.user,
-    required this.text,
-    required this.time,
-    this.likes = 0,
-    List<CommentItem>? replies,
-  }) : replies = replies ?? [];
-}
-
-// Sample data until comments come from the API.
-List<CommentItem> _sampleComments() => [
-      CommentItem(
-        id: 'c1',
-        user: 'mia',
-        time: '2h',
-        text: 'Love this vibe 🔥',
-        likes: 24,
-        replies: [
-          CommentItem(id: 'r1', user: 'alex', time: '1h', text: 'Right? What song is this?', likes: 3),
-          CommentItem(id: 'r2', user: 'leo', time: '50m', text: 'Same, I need this playlist', likes: 1),
-        ],
-      ),
-      CommentItem(id: 'c2', user: 'zara', time: '5h', text: 'Where was this taken?', likes: 4),
-      CommentItem(
-        id: 'c3',
-        user: 'leo',
-        time: '8h',
-        text: 'Follow me back please 🙌',
-        likes: 2,
-        replies: [
-          CommentItem(id: 'r3', user: 'mia', time: '7h', text: 'Done!', likes: 0),
-        ],
-      ),
-    ];
 
 class CommentsSheet extends StatefulWidget {
   final String postId;
@@ -72,11 +29,19 @@ class CommentsSheet extends StatefulWidget {
 }
 
 class _CommentsSheetState extends State<CommentsSheet> {
-  final List<CommentItem> _comments = _sampleComments();
+  final List<CommentModel> _comments = [];
   final TextEditingController _input = TextEditingController();
-  CommentItem? _replyTo;
+  bool _loading = true;
+  String? _error;
+  int _tempSeq = 0;
+  CommentModel? _replyTo;
   String? _replyMention;
-  int _nextId = 1;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
 
   @override
   void dispose() {
@@ -84,14 +49,115 @@ class _CommentsSheetState extends State<CommentsSheet> {
     super.dispose();
   }
 
-  void _toggleLike(CommentItem c) {
+  Future<void> _load() async {
     setState(() {
-      c.liked = !c.liked;
-      c.likes += c.liked ? 1 : -1;
+      _loading = true;
+      _error = null;
     });
+    try {
+      final list = await social.fetchComments(widget.postId);
+      if (!mounted) return;
+      setState(() {
+        _comments
+          ..clear()
+          ..addAll(list)
+          // Ordered on the device by the C++ core.
+          ..sort((a, b) => b.score.compareTo(a.score));
+        _loading = false;
+      });
+    } on DataException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = e.retryable ? "Can't reach the server." : e.message;
+      });
+    }
   }
 
-  void _startReply(CommentItem parent, {String? mention}) {
+  // ---- Actions: update now, send in the background ----
+
+  void _send() {
+    final text = _input.text.trim();
+    if (text.isEmpty) return;
+    final parent = _replyTo;
+    final tempId = 'tmp${++_tempSeq}';
+    final temp = CommentModel(id: tempId, parentId: parent?.id, user: kCurrentUser, text: text, time: 'now');
+
+    setState(() {
+      if (parent != null) {
+        parent.replies.add(temp);
+        parent.showReplies = true;
+      } else {
+        _comments.insert(0, temp);
+      }
+      _replyTo = null;
+      _replyMention = null;
+      _input.clear();
+    });
+
+    InteractionQueue.instance.enqueue<CommentModel>(
+      'comment:$tempId',
+      () {
+        // A reply waits until its parent comment has been saved.
+        final pid = parent?.id;
+        if (pid != null && pid.startsWith('tmp')) {
+          throw const DataException('Waiting for parent comment', retryable: true);
+        }
+        return social.addComment(widget.postId, text, parentId: pid);
+      },
+      onSuccess: (server) {
+        if (!mounted) return;
+        setState(() {
+          temp.id = server.id;
+          temp.time = server.time;
+          temp.ageMinutes = server.ageMinutes;
+        });
+      },
+      onFail: (_) {
+        if (!mounted) return;
+        setState(() {
+          _comments.remove(temp);
+          parent?.replies.remove(temp);
+        });
+        ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+          const SnackBar(content: Text('Comment not sent. Try again.')),
+        );
+      },
+    );
+  }
+
+  void _toggleLike(CommentModel c) {
+    if (c.isPending) return;
+    final wasLiked = c.liked;
+    final prevLikes = c.likes;
+    final nowLiked = !wasLiked;
+    setState(() {
+      c.liked = nowLiked;
+      c.likes += nowLiked ? 1 : -1;
+    });
+
+    InteractionQueue.instance.enqueue<LikeResult>(
+      'clike:${c.id}',
+      () => social.setCommentLike(c.id, nowLiked),
+      onSuccess: (r) {
+        if (!mounted) return;
+        setState(() {
+          c.liked = r.liked;
+          c.likes = r.count;
+        });
+      },
+      onFail: (_) {
+        if (!mounted) return;
+        setState(() {
+          c.liked = wasLiked;
+          c.likes = prevLikes;
+        });
+      },
+    );
+  }
+
+  void _startReply(CommentModel parent, {String? mention}) {
+    if (parent.isPending) return;
     setState(() {
       _replyTo = parent;
       _replyMention = mention;
@@ -102,43 +168,24 @@ class _CommentsSheetState extends State<CommentsSheet> {
     });
   }
 
-  void _cancelReply() {
-    setState(() {
-      _replyTo = null;
-      _replyMention = null;
-    });
-  }
-
-  void _send() {
-    final text = _input.text.trim();
-    if (text.isEmpty) return;
-    final item = CommentItem(id: 'n${_nextId++}', user: 'you', text: text, time: 'now');
-    setState(() {
-      final parent = _replyTo;
-      if (parent != null) {
-        parent.replies.add(item);
-        parent.showReplies = true;
-      } else {
-        _comments.insert(0, item);
-      }
-      _replyTo = null;
-      _replyMention = null;
-      _input.clear();
-    });
-  }
+  void _cancelReply() => setState(() {
+        _replyTo = null;
+        _replyMention = null;
+      });
 
   void _addReaction(String emoji) {
     final sel = _input.selection;
     final text = _input.text;
     final start = sel.isValid ? sel.start : text.length;
     final end = sel.isValid ? sel.end : text.length;
-    final newText = text.replaceRange(start, end, emoji);
     _input.value = TextEditingValue(
-      text: newText,
+      text: text.replaceRange(start, end, emoji),
       selection: TextSelection.collapsed(offset: start + emoji.length),
     );
     setState(() {});
   }
+
+  // ---- Layout ----
 
   @override
   Widget build(BuildContext context) {
@@ -161,13 +208,7 @@ class _CommentsSheetState extends State<CommentsSheet> {
           child: Column(
             children: [
               _header(),
-              Expanded(
-                child: ListView(
-                  controller: scroll,
-                  padding: const EdgeInsets.only(top: 4, bottom: 8),
-                  children: [for (final c in _comments) _thread(c)],
-                ),
-              ),
+              Expanded(child: _body(scroll)),
               _composer(safeBottom),
             ],
           ),
@@ -199,7 +240,44 @@ class _CommentsSheetState extends State<CommentsSheet> {
     );
   }
 
-  Widget _thread(CommentItem c) {
+  Widget _body(ScrollController scroll) {
+    if (_loading) {
+      return const Center(
+        child: SizedBox(
+          width: 22,
+          height: 22,
+          child: CircularProgressIndicator(strokeWidth: 2, color: kPrimary),
+        ),
+      );
+    }
+    if (_error != null) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(_error!, style: const TextStyle(fontSize: 14, color: kMuted)),
+            const SizedBox(height: 8),
+            TextButton(
+              onPressed: _load,
+              child: const Text('Try again', style: TextStyle(color: kPrimary)),
+            ),
+          ],
+        ),
+      );
+    }
+    if (_comments.isEmpty) {
+      return const Center(
+        child: Text('No comments yet', style: TextStyle(fontSize: 14, color: kMuted)),
+      );
+    }
+    return ListView(
+      controller: scroll,
+      padding: const EdgeInsets.only(top: 4, bottom: 8),
+      children: [for (final c in _comments) _thread(c)],
+    );
+  }
+
+  Widget _thread(CommentModel c) {
     final count = c.replies.length;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -219,11 +297,7 @@ class _CommentsSheetState extends State<CommentsSheet> {
                     c.showReplies
                         ? 'Hide replies'
                         : 'View $count more ${count == 1 ? 'reply' : 'replies'}',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
-                      color: kMuted,
-                    ),
+                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: kMuted),
                   ),
                 ],
               ),
@@ -238,7 +312,7 @@ class _CommentsSheetState extends State<CommentsSheet> {
     );
   }
 
-  Widget _tile(CommentItem c, {CommentItem? parent}) {
+  Widget _tile(CommentModel c, {CommentModel? parent}) {
     final isReply = parent != null;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
@@ -250,11 +324,7 @@ class _CommentsSheetState extends State<CommentsSheet> {
             backgroundColor: kLine,
             child: Text(
               c.user[0].toUpperCase(),
-              style: TextStyle(
-                fontSize: isReply ? 10 : 12,
-                fontWeight: FontWeight.w600,
-                color: kMuted,
-              ),
+              style: TextStyle(fontSize: isReply ? 10 : 12, fontWeight: FontWeight.w600, color: kMuted),
             ),
           ),
           const SizedBox(width: 10),
@@ -266,21 +336,14 @@ class _CommentsSheetState extends State<CommentsSheet> {
                   children: [
                     Text(
                       c.user,
-                      style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: kInk,
-                      ),
+                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: kInk),
                     ),
                     const SizedBox(width: 6),
                     Text(c.time, style: const TextStyle(fontSize: 12, color: kMuted)),
                   ],
                 ),
                 const SizedBox(height: 2),
-                Text(
-                  c.text,
-                  style: const TextStyle(fontSize: 14, height: 1.3, color: kInk),
-                ),
+                Text(c.text, style: const TextStyle(fontSize: 14, height: 1.3, color: kInk)),
                 const SizedBox(height: 2),
                 GestureDetector(
                   behavior: HitTestBehavior.opaque,
@@ -289,11 +352,7 @@ class _CommentsSheetState extends State<CommentsSheet> {
                     padding: EdgeInsets.symmetric(vertical: 2),
                     child: Text(
                       'Reply',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                        color: kMuted,
-                      ),
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: kMuted),
                     ),
                   ),
                 ),
@@ -321,9 +380,7 @@ class _CommentsSheetState extends State<CommentsSheet> {
     );
 
     return Container(
-      decoration: const BoxDecoration(
-        border: Border(top: BorderSide(color: kLine)),
-      ),
+      decoration: const BoxDecoration(border: Border(top: BorderSide(color: kLine))),
       padding: EdgeInsets.fromLTRB(12, 8, 4, 8 + safeBottom),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -364,11 +421,7 @@ class _CommentsSheetState extends State<CommentsSheet> {
                 backgroundColor: kPrimary,
                 child: Text(
                   'Y',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white,
-                  ),
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.white),
                 ),
               ),
               const SizedBox(width: 10),
@@ -385,8 +438,7 @@ class _CommentsSheetState extends State<CommentsSheet> {
                     isDense: true,
                     filled: true,
                     fillColor: const Color(0xFFF3F3F5),
-                    contentPadding:
-                        const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                     border: noBorder,
                     enabledBorder: noBorder,
                     focusedBorder: noBorder,

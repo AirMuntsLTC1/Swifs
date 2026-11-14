@@ -18,17 +18,21 @@ UI_FILES = [
 NATIVE_FILES = [
     'app/native/CMakeLists.txt',
     'app/native/src/swifs_core.cpp',
+    'tests/native/test_core.cpp',
     'app/native/include/swifs_core.h',
     'app/lib/core/native/swifs_ffi.dart',
     'android-native/bridge/src/main/kotlin/com/swifs/native/NativeBridge.kt',
 ]
 
-BACKEND_FILES = [
-    'backend/composer.json',
-    'backend/public/index.php',
-    'backend/src/Core/Router.php',
-    'backend/routes/api.php',
-    'backend/config/config.php',
+DATA_FILES = [
+    'app/lib/core/data/models.dart',
+    'app/lib/core/data/social_repository.dart',
+    'app/lib/core/data/mock_social_repository.dart',
+    'app/lib/core/data/supabase_social_repository.dart',
+    'app/lib/core/data/social.dart',
+    'app/lib/core/config/supabase_config.dart',
+    'app/lib/core/network/interaction_queue.dart',
+    'supabase/schema.sql',
 ]
 
 CI_FILES = [
@@ -52,27 +56,19 @@ def check_no_db():
     print('[OK] No database folder')
     return True
 
-def check_no_supabase():
-    refs = 0
-    for path in ('backend/config/config.php', 'backend/routes/api.php'):
-        if os.path.exists(path):
-            with open(path, encoding='utf-8', errors='ignore') as f:
-                refs += f.read().lower().count('supabase')
-    if refs > 0:
-        print('[FAIL] Supabase references found: ' + str(refs))
+def check_schema():
+    """The schema must create every table and function the app calls."""
+    if not os.path.exists('supabase/schema.sql'):
+        print('[FAIL] supabase/schema.sql missing')
         return False
-    print('[OK] Zero Supabase references')
+    text = open('supabase/schema.sql', encoding='utf-8').read()
+    needed = ['get_feed', 'get_comments', 'set_like', 'set_save', 'set_follow', 'add_comment', 'set_comment_like']
+    missing = [n for n in needed if ('function public.' + n) not in text]
+    if missing:
+        print('[FAIL] schema.sql missing functions: ' + ', '.join(missing))
+        return False
+    print('[OK] schema.sql has all ' + str(len(needed)) + ' functions')
     return True
-
-def check_json():
-    try:
-        with open('backend/composer.json', encoding='utf-8') as f:
-            json.load(f)
-        print('[OK] composer.json valid')
-        return True
-    except Exception as e:
-        print('[FAIL] composer.json: ' + str(e))
-        return False
 
 def count_loc():
     total = 0
@@ -98,10 +94,8 @@ if __name__ == '__main__':
     ok = True
     ok = check('UI screens', UI_FILES) and ok
     ok = check('Native layer', NATIVE_FILES) and ok
-    ok = check('Backend mocks', BACKEND_FILES) and ok
+    ok = check('Data layer and Supabase', DATA_FILES) and ok
     ok = check('CI workflows', CI_FILES) and ok
-    ok = check_no_db() and ok
-    ok = check_no_supabase() and ok
-    ok = check_json() and ok
+    ok = check_schema() and ok
     count_loc()
     sys.exit(0 if ok else 1)
