@@ -87,7 +87,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('@\${p['user']}', style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 14)),
+                        Text('@${p['user']}', style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 14)),
                         Text(p['time'], style: const TextStyle(fontSize: 12, color: Colors.grey)),
                       ],
                     ),
@@ -120,10 +120,10 @@ class _HomeScreenState extends State<HomeScreen> {
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 12),
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text('\${p['likes'] + (p['liked'] ? 1 : 0)} likes', style: const TextStyle(fontWeight: FontWeight.w500)),
+                  Text('${p['likes'] + (p['liked'] ? 1 : 0)} likes', style: const TextStyle(fontWeight: FontWeight.w500)),
                   const SizedBox(height: 4),
                   Text.rich(TextSpan(children: [
-                    TextSpan(text: '@\${p['user']} ', style: const TextStyle(fontWeight: FontWeight.w500)),
+                    TextSpan(text: '@${p['user']} ', style: const TextStyle(fontWeight: FontWeight.w500)),
                     TextSpan(text: p['caption']),
                   ])),
                 ]),
