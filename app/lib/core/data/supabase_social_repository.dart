@@ -1,73 +1,289 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../cache/local_cache.dart';
 import 'models.dart';
 import 'social_repository.dart';
 
-/// Real server. Calls the SQL functions in supabase/schema.sql.
-/// Needs: flutter pub add supabase_flutter, and Supabase.initialize() in main.dart.
+/// Reads and writes your existing Supabase tables:
+/// posts, profiles, comments, post_likes, post_saves, follows, and comment_likes (see supabase/comment_likes.sql).
 class SupabaseSocialRepository implements SocialRepository {
+  final LocalCache _cache = LocalCache.instance;
+
   SupabaseClient get _db => Supabase.instance.client;
 
-  /// Turns Supabase errors into DataException. Server rejections are not retried. Everything else is.
+  String get _me {
+    final id = _db.auth.currentUser?.id;
+    if (id == null) throw const DataException('Please sign in.', retryable: true);
+    return id;
+  }
+
+  /// Turns Supabase errors into DataException. Server rejections are not retried; network errors are.
   Future<T> _guard<T>(Future<T> Function() run) async {
     try {
       return await run();
+    } on DataException {
+      rethrow;
     } on PostgrestException catch (e) {
       throw DataException(e.message, retryable: false);
     } catch (_) {
-      throw const DataException('Offline or unreachable', retryable: true);
+      throw const DataException("Can't reach the server.", retryable: true);
     }
   }
 
-  Map<String, dynamic> _row(dynamic rows) {
-    final list = rows as List<dynamic>;
-    if (list.isEmpty) throw const DataException('No data returned');
-    return Map<String, dynamic>.from(list.first as Map);
+  int _ageMinutes(Object? createdAt) {
+    final t = DateTime.tryParse(createdAt?.toString() ?? '');
+    if (t == null) return 0;
+    final m = DateTime.now().toUtc().difference(t.toUtc()).inMinutes;
+    return m < 0 ? 0 : m;
+  }
+
+  Future<Map<String, Map<String, dynamic>>> _profilesFor(List<String> ids) async {
+    if (ids.isEmpty) return {};
+    final rows = await _db
+        .from('profiles')
+        .select('id, username, display_name, avatar_url')
+        .inFilter('id', ids);
+    final map = {for (final r in rows) r['id'].toString(): Map<String, dynamic>.from(r)};
+    final cached = (await _cache.read('cache.profiles') as Map?) ?? {};
+    await _cache.write('cache.profiles', {...cached, ...map});
+    return map;
+  }
+
+  // ------------------------------------------------------------------
+  // Feed
+  // ------------------------------------------------------------------
+
+  @override
+  Future<List<FeedPost>?> cachedFeed() async {
+    final raw = await _cache.read('cache.feed');
+    if (raw is! List) return null;
+    return raw.map((e) => FeedPost.fromMap(Map<String, dynamic>.from(e as Map))).toList();
   }
 
   @override
   Future<List<FeedPost>> fetchFeed() => _guard(() async {
-        final rows = await _db.rpc('get_feed') as List<dynamic>;
-        return rows.map((r) => FeedPost.fromRow(Map<String, dynamic>.from(r as Map))).toList();
+        final me = _me;
+        final postRows = await _db
+            .from('posts')
+            .select('id, author_id, text, likes, created_at')
+            .order('created_at', ascending: false)
+            .limit(50);
+        final posts = postRows.map((e) => Map<String, dynamic>.from(e)).toList();
+        if (posts.isEmpty) {
+          await _cache.write('cache.feed', []);
+          return <FeedPost>[];
+        }
+
+        final postIds = posts.map((p) => p['id'].toString()).toList();
+        final authorIds = posts.map((p) => p['author_id'].toString()).toSet().toList();
+
+        final profiles = await _profilesFor(authorIds);
+        final commentRows = await _db.from('comments').select('post_id').inFilter('post_id', postIds);
+        final likeRows = await _db.from('post_likes').select('post_id').eq('user_id', me).inFilter('post_id', postIds);
+        final saveRows = await _db.from('post_saves').select('post_id').eq('user_id', me).inFilter('post_id', postIds);
+        final followRows = await _db.from('follows').select('followee').eq('follower', me);
+
+        final commentCounts = <String, int>{};
+        for (final r in commentRows) {
+          final k = r['post_id'].toString();
+          commentCounts[k] = (commentCounts[k] ?? 0) + 1;
+        }
+        final liked = {for (final r in likeRows) r['post_id'].toString()};
+        final saved = {for (final r in saveRows) r['post_id'].toString()};
+        final following = {for (final r in followRows) r['followee'].toString()};
+
+        final list = posts.map((p) {
+          final pid = p['id'].toString();
+          final aid = p['author_id'].toString();
+          final profile = profiles[aid] ?? <String, dynamic>{};
+          return FeedPost(
+            id: pid,
+            authorId: aid,
+            user: (profile['username'] ?? 'user').toString(),
+            displayName: (profile['display_name'] ?? '').toString(),
+            avatarUrl: profile['avatar_url']?.toString(),
+            caption: (p['text'] ?? '').toString(),
+            views: 0,
+            ageMinutes: _ageMinutes(p['created_at']),
+            likes: (p['likes'] as num?)?.toInt() ?? 0,
+            comments: commentCounts[pid] ?? 0,
+            liked: liked.contains(pid),
+            isSaved: saved.contains(pid),
+            isFollowing: following.contains(aid),
+          );
+        }).toList();
+
+        await _cache.write('cache.feed', list.map((p) => p.toMap()).toList());
+        return list;
       });
 
   @override
   Future<LikeResult> setLike(String postId, bool liked) => _guard(() async {
-        final row = _row(await _db.rpc('set_like', params: {'p_post_id': postId, 'p_liked': liked}));
-        return LikeResult(liked: row['is_liked'] == true, count: (row['like_count'] as num).toInt());
+        final me = _me;
+        final existing = await _db.from('post_likes').select('post_id').eq('post_id', postId).eq('user_id', me);
+        if (liked && existing.isEmpty) {
+          await _db.from('post_likes').insert({'post_id': postId, 'user_id': me});
+        } else if (!liked && existing.isNotEmpty) {
+          await _db.from('post_likes').delete().eq('post_id', postId).eq('user_id', me);
+        }
+        final post = await _db.from('posts').select('likes').eq('id', postId).single();
+        return LikeResult(liked: liked, count: (post['likes'] as num?)?.toInt() ?? 0);
       });
 
   @override
   Future<bool> setSave(String postId, bool saved) => _guard(() async {
-        final row = _row(await _db.rpc('set_save', params: {'p_post_id': postId, 'p_saved': saved}));
-        return row['is_saved'] == true;
+        final me = _me;
+        final existing = await _db.from('post_saves').select('post_id').eq('post_id', postId).eq('user_id', me);
+        if (saved && existing.isEmpty) {
+          await _db.from('post_saves').insert({'post_id': postId, 'user_id': me});
+        } else if (!saved && existing.isNotEmpty) {
+          await _db.from('post_saves').delete().eq('post_id', postId).eq('user_id', me);
+        }
+        return saved;
       });
 
   @override
-  Future<bool> setFollow(String username, bool following) => _guard(() async {
-        final row = _row(await _db.rpc('set_follow', params: {'p_username': username, 'p_follow': following}));
-        return row['is_following'] == true;
+  Future<bool> setFollow(String authorId, bool following) => _guard(() async {
+        final me = _me;
+        if (authorId == me) throw const DataException("You can't follow yourself.");
+        final existing = await _db.from('follows').select('followee').eq('follower', me).eq('followee', authorId);
+        if (following && existing.isEmpty) {
+          await _db.from('follows').insert({'follower': me, 'followee': authorId});
+        } else if (!following && existing.isNotEmpty) {
+          await _db.from('follows').delete().eq('follower', me).eq('followee', authorId);
+        }
+        return following;
       });
+
+  // ------------------------------------------------------------------
+  // Comments
+  // ------------------------------------------------------------------
+
+  @override
+  Future<List<CommentModel>?> cachedComments(String postId) async {
+    final raw = await _cache.read('cache.comments.$postId');
+    if (raw is! List) return null;
+    final flat = raw.map((e) => CommentModel.fromFlat(Map<String, dynamic>.from(e as Map))).toList();
+    return buildCommentTree(flat);
+  }
 
   @override
   Future<List<CommentModel>> fetchComments(String postId) => _guard(() async {
-        final rows = await _db.rpc('get_comments', params: {'p_post_id': postId}) as List<dynamic>;
-        final flat = rows.map((r) => CommentModel.fromRow(Map<String, dynamic>.from(r as Map))).toList();
+        final me = _me;
+        final rows = await _db
+            .from('comments')
+            .select('id, post_id, parent_id, author_id, text, created_at')
+            .eq('post_id', postId)
+            .order('created_at', ascending: true);
+        final list = rows.map((e) => Map<String, dynamic>.from(e)).toList();
+
+        final ids = list.map((r) => r['id'].toString()).toList();
+        final authorIds = list.map((r) => r['author_id'].toString()).toSet().toList();
+        final profiles = await _profilesFor(authorIds);
+
+        final likeRows = ids.isEmpty
+            ? <Map<String, dynamic>>[]
+            : await _db.from('comment_likes').select('comment_id, user_id').inFilter('comment_id', ids);
+        final counts = <String, int>{};
+        final mine = <String>{};
+        for (final r in likeRows) {
+          final cid = r['comment_id'].toString();
+          counts[cid] = (counts[cid] ?? 0) + 1;
+          if (r['user_id'].toString() == me) mine.add(cid);
+        }
+
+        final flat = list.map((r) {
+          final id = r['id'].toString();
+          final aid = r['author_id'].toString();
+          final age = _ageMinutes(r['created_at']);
+          return CommentModel(
+            id: id,
+            parentId: r['parent_id']?.toString(),
+            authorId: aid,
+            user: (profiles[aid]?['username'] ?? 'user').toString(),
+            text: (r['text'] ?? '').toString(),
+            time: formatAge(age),
+            ageMinutes: age,
+            likes: counts[id] ?? 0,
+            liked: mine.contains(id),
+          );
+        }).toList();
+
+        await _cache.write('cache.comments.$postId', flat.map((c) => c.toFlat()).toList());
         return buildCommentTree(flat);
       });
 
   @override
-  Future<CommentModel> addComment(String postId, String text, {String? parentId}) => _guard(() async {
-        final row = _row(await _db.rpc('add_comment', params: {
-          'p_post_id': postId,
-          'p_body': text,
-          'p_parent_id': parentId,
-        }));
-        return CommentModel.fromRow(row);
+  Future<CommentModel> addComment(String postId, String text, {String? parentId, String? tempId}) => _guard(() async {
+        final me = _me;
+        final resolvedParent = await _resolveId(parentId);
+        final row = await _db
+            .from('comments')
+            .insert({'post_id': postId, 'author_id': me, 'text': text, 'parent_id': resolvedParent})
+            .select()
+            .single();
+        final serverId = row['id'].toString();
+        if (tempId != null) {
+          final map = Map<String, dynamic>.from((await _cache.read('cache.tmpids') as Map?) ?? {});
+          map[tempId] = serverId;
+          await _cache.write('cache.tmpids', map);
+        }
+        final profile = await _profilesFor([me]);
+        return CommentModel(
+          id: serverId,
+          parentId: resolvedParent,
+          authorId: me,
+          user: (profile[me]?['username'] ?? kCurrentUser).toString(),
+          text: text,
+          time: 'now',
+        );
       });
+
+  /// A reply made to a comment that was still waiting for the server: use its server id once it has one.
+  Future<String?> _resolveId(String? id) async {
+    if (id == null || !id.startsWith('tmp')) return id;
+    final map = (await _cache.read('cache.tmpids') as Map?) ?? {};
+    final real = map[id]?.toString();
+    if (real == null) throw const DataException('Waiting for the comment above to send.', retryable: true);
+    return real;
+  }
 
   @override
   Future<LikeResult> setCommentLike(String commentId, bool liked) => _guard(() async {
-        final row = _row(await _db.rpc('set_comment_like', params: {'p_comment_id': commentId, 'p_liked': liked}));
-        return LikeResult(liked: row['is_liked'] == true, count: (row['like_count'] as num).toInt());
+        final me = _me;
+        final existing = await _db.from('comment_likes').select('comment_id').eq('comment_id', commentId).eq('user_id', me);
+        if (liked && existing.isEmpty) {
+          await _db.from('comment_likes').insert({'comment_id': commentId, 'user_id': me});
+        } else if (!liked && existing.isNotEmpty) {
+          await _db.from('comment_likes').delete().eq('comment_id', commentId).eq('user_id', me);
+        }
+        final all = await _db.from('comment_likes').select('comment_id').eq('comment_id', commentId);
+        return LikeResult(liked: liked, count: all.length);
       });
+
+  // ------------------------------------------------------------------
+  // Outbox
+  // ------------------------------------------------------------------
+
+  @override
+  Future<dynamic> run(OutboxOp op) {
+    final a = op.args;
+    switch (op.kind) {
+      case 'like':
+        return setLike(a['postId'] as String, a['liked'] as bool);
+      case 'save':
+        return setSave(a['postId'] as String, a['saved'] as bool);
+      case 'follow':
+        return setFollow(a['authorId'] as String, a['following'] as bool);
+      case 'comment':
+        return addComment(
+          a['postId'] as String,
+          a['text'] as String,
+          parentId: a['parentId'] as String?,
+          tempId: a['tempId'] as String?,
+        );
+      case 'commentLike':
+        return setCommentLike(a['commentId'] as String, a['liked'] as bool);
+    }
+    throw DataException('Unknown action: ${op.kind}');
+  }
 }

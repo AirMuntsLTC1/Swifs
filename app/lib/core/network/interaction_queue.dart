@@ -1,39 +1,49 @@
+import '../cache/local_cache.dart';
 import '../data/models.dart';
+import '../data/social.dart';
 
-/// Background sender for likes, saves, follows and comments.
+/// Outbox: sends likes, saves, follows and comments to Supabase in the background.
 ///
-/// The screen updates at once. The task runs here, in order.
-/// - Network failures (DataException.retryable) are retried with backoff.
-/// - Server rejections call onFail so the screen can undo the change.
-/// - A newer task with the same key replaces an unsent one. Tasks describe the
-///   desired state, so the final state is always the last one the user chose.
-///
-/// Pending tasks live in memory. If the app closes while they are waiting, they are lost.
+/// - The screen updates at once. The action is saved on the phone first, so it survives
+///   closing the app or going offline.
+/// - Network failures are retried with backoff. Server rejections call onFail so the screen can undo.
+/// - A newer action with the same key replaces an unsent one.
 class InteractionQueue {
   InteractionQueue._();
   static final InteractionQueue instance = InteractionQueue._();
 
-  static const int _maxAttempts = 6;
-  static const List<int> _backoffSeconds = [1, 2, 4, 8, 15];
+  static const int _maxAttempts = 8;
+  static const List<int> _backoffSeconds = [2, 5, 10, 20, 40, 60];
 
   final List<_Job> _jobs = [];
   bool _running = false;
+  bool _restored = false;
 
-  void enqueue<T>(
-    String key,
-    Future<T> Function() task, {
-    void Function(T result)? onSuccess,
-    void Function(DataException error)? onFail,
-  }) {
-    _jobs.removeWhere((j) => j.key == key && !j.inFlight);
-    _jobs.add(_Job(
-      key: key,
-      task: () => task(),
-      onOk: (r) => onSuccess?.call(r as T),
-      onErr: (e) => onFail?.call(e),
-    ));
+  /// Loads actions saved from last time and sends them. Call once at app start.
+  Future<void> restore() async {
+    if (_restored) return;
+    _restored = true;
+    final raw = await LocalCache.instance.read('outbox');
+    if (raw is List) {
+      for (final e in raw) {
+        _jobs.add(_Job(OutboxOp.fromJson(Map<String, dynamic>.from(e as Map)), null, null));
+      }
+    }
     _pump();
   }
+
+  void enqueue(
+    OutboxOp op, {
+    void Function(dynamic result)? onSuccess,
+    void Function(DataException error)? onFail,
+  }) {
+    _jobs.removeWhere((j) => j.op.key == op.key && !j.inFlight);
+    _jobs.add(_Job(op, onSuccess, onFail));
+    _save();
+    _pump();
+  }
+
+  Future<void> _save() => LocalCache.instance.write('outbox', [for (final j in _jobs) j.op.toJson()]);
 
   Future<void> _pump() async {
     if (_running) return;
@@ -43,7 +53,7 @@ class InteractionQueue {
         final now = DateTime.now();
         final ready = _jobs.where((j) => !j.nextAt.isAfter(now)).toList();
         if (ready.isEmpty) {
-          await Future.delayed(const Duration(milliseconds: 300));
+          await Future.delayed(const Duration(milliseconds: 500));
           continue;
         }
 
@@ -51,7 +61,7 @@ class InteractionQueue {
         job.inFlight = true;
         dynamic result;
         try {
-          result = await job.task();
+          result = await social.run(job.op);
         } on DataException catch (e) {
           job.inFlight = false;
           if (e.retryable && job.attempts < _maxAttempts - 1) {
@@ -59,18 +69,21 @@ class InteractionQueue {
             job.nextAt = DateTime.now().add(_backoff(job.attempts));
           } else {
             _jobs.remove(job);
-            job.onErr(e);
+            await _save();
+            job.onFail?.call(e);
           }
           continue;
         } catch (e) {
           job.inFlight = false;
           _jobs.remove(job);
-          job.onErr(DataException(e.toString()));
+          await _save();
+          job.onFail?.call(DataException(e.toString()));
           continue;
         }
 
         _jobs.remove(job);
-        job.onOk(result);
+        await _save();
+        job.onSuccess?.call(result);
       }
     } finally {
       _running = false;
@@ -84,13 +97,12 @@ class InteractionQueue {
 }
 
 class _Job {
-  final String key;
-  final Future<dynamic> Function() task;
-  final void Function(dynamic result) onOk;
-  final void Function(DataException error) onErr;
+  final OutboxOp op;
+  final void Function(dynamic result)? onSuccess;
+  final void Function(DataException error)? onFail;
   int attempts = 0;
   bool inFlight = false;
   DateTime nextAt = DateTime.fromMillisecondsSinceEpoch(0);
 
-  _Job({required this.key, required this.task, required this.onOk, required this.onErr});
+  _Job(this.op, this.onSuccess, this.onFail);
 }

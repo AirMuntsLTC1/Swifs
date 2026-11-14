@@ -1,62 +1,59 @@
-SWIFS: SUPABASE-READY DATA LAYER (PHP REMOVED)
+SWIFS: LOGIN, SIGN-UP, FORGOT PASSWORD, OFFLINE CACHE (YOUR SUPABASE TABLES)
 
-WHAT CHANGED
-  - The PHP backend and its Termux steps are gone.
-  - Every screen now reads and writes through one data layer:
-      app/lib/core/data/social.dart
-  - Right now the app runs on built-in sample data, so you can keep designing.
-  - When you connect Supabase, one line switches it over.
-  - Likes, saves, follows and comments work the same as before:
-    instant on screen, sent in the background, undone if the server rejects them.
-  - Scores come from the C++ core.
+WHAT IS IN THIS UPDATE
+  - Login screen, Forgot password, and Create account (Facebook style, one step per screen):
+      1. Name: display name, first name, last name
+      2. Email (a code is sent)
+      3. Enter the 6-digit code (checked by your email-code-auth function)
+      4. Create a password, then "Creating your account..." until it is done
+    The username is made for you: Wilme Olid -> wilmeolid_fhr23
+  - Logout really signs out.
+  - Feed, comments, likes, saves, follows and comment likes read and write your real tables.
+  - Offline first: the saved feed and comments show at once. Likes, saves, follows and comments
+    are saved on the phone and sent when there is a connection.
+  - Your design and layout are kept.
 
-STEP 1: INSTALL NOW (Termux)
+STEP 1: FILL IN YOUR SUPABASE CONFIG (not in this zip)
+  Open app/lib/core/config/supabase_config.dart and set:
+    kSupabaseUrl      = your Project URL   (Settings > API)
+    kSupabaseAnonKey  = your anon public key
+  Use the anon key only. Never put the service_role key in the app.
+
+STEP 2: DATABASE (SQL Editor, run once)
+  Run supabase/comment_likes.sql. Your database has no table for comment likes yet.
+
+STEP 3: EDGE FUNCTION (deploy the new email-code-auth)
+  Either:
+    supabase functions deploy email-code-auth --no-verify-jwt
+  or, in the dashboard: Edge Functions > email-code-auth > Edit,
+  paste supabase/functions/email-code-auth/index.ts, then Deploy.
+  The secrets it uses (EMAIL_CODE_PEPPER, SUPABASE_SERVICE_ROLE_KEY, GOOGLE_*) already exist.
+  The existing actions (login, send_code, verify_code) still work.
+  New actions: check_code, create_account, reset_password.
+
+STEP 4: INSTALL IN THE REPO (Termux)
   cd ~/swifs
-  unzip -o ~/supabase-ready-update.zip
-  python3 scripts/apply_data_layer.py
-  git rm -r -q --ignore-unmatch backend tests/parity scripts/apply_backend.py
+  unzip -o ~/auth-update.zip
+  git rm -q --ignore-unmatch app/lib/core/data/mock_social_repository.dart supabase/schema.sql
   git add -A
-  git commit -m "Supabase-ready data layer; remove PHP backend"
+  git commit -m "Login, sign-up, forgot password, offline cache"
   git push
 
-  apply_data_layer.py changes only the data code in home_screen.dart.
-  Your layout and design stay as they are.
+  supabase/schema.sql is removed because it describes tables you do not use.
 
-STEP 2: CONNECT SUPABASE (later, when the design is ready)
-  a. supabase.com > New project.
-     Settings > API: copy the Project URL and the anon public key.
-  b. SQL Editor > New query > paste supabase/schema.sql > Run.
-  c. Paste the URL and anon key into:
-       app/lib/core/config/supabase_config.dart
-  d. cd ~/swifs/app
-     flutter pub add supabase_flutter
-  e. In app/lib/main.dart, replace main() with:
+STEP 5: TEST (after the build finishes and you install the APK)
+  - Create account: name > email > code from your inbox > password > you are logged in.
+  - Log out in Settings, then log in with the email and password.
+  - Forgotten password: email > code > new password > you are logged in.
+  - Turn on airplane mode, open the app: the feed and comments still show.
+    Like a post, then turn the connection back on: the like is sent.
 
-       import 'package:supabase_flutter/supabase_flutter.dart';
-       import 'core/config/supabase_config.dart';
-
-       Future<void> main() async {
-         WidgetsFlutterBinding.ensureInitialized();
-         await Supabase.initialize(url: kSupabaseUrl, anonKey: kSupabaseAnonKey);
-         runApp(const ProviderScope(child: SwifsApp()));
-       }
-
-  f. In app/lib/core/data/social.dart:
-       - uncomment:  // import 'supabase_social_repository.dart';
-       - in createSocialRepository(), return SupabaseSocialRepository()
-         instead of MockSocialRepository().
-  g. Commit and push.
-
-IMPORTANT
-  - Likes, saves, follows and comments need a signed-in user, because the
-    security rules use auth.uid(). The app has no sign-in screen yet. Add
-    Supabase Auth (email and password, for example) before testing writes.
-    Sign-up can pass { "username": "..." } so the profile gets that name.
-  - Never put the service_role key in the app. Only the anon key.
-  - Until step 2d runs, "flutter analyze" reports supabase_social_repository.dart
-    because the package is not installed yet. The app build is not affected.
-
-KNOWN LIMITS
-  - Pending actions wait in memory. If the app closes while offline, they are lost.
-  - The feed is ranked on the phone with the C++ core, not on the server.
-  - The feed loads the 50 newest posts.
+NOTES
+  - Username: the example wilmeolid_fhr23 has 3 letters and 2 numbers, so the code uses 3 letters.
+    To change it, edit usernameLetters in app/lib/core/auth/auth_service.dart.
+  - Passwords need at least 8 characters.
+  - A code is valid for 10 minutes. After it is checked you have 20 minutes to finish.
+  - Not connected yet (still sample data): the Profile tab, Messages, Stories and Notifications.
+    Tell me which one you want next.
+  - Pending actions survive closing the app. Failed actions are dropped after about 8 retries,
+    and the screen is put back the way it was.

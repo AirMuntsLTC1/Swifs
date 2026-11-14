@@ -49,32 +49,46 @@ class _CommentsSheetState extends State<CommentsSheet> {
     super.dispose();
   }
 
+  /// Shows the saved comments at once, then refreshes them from Supabase.
   Future<void> _load() async {
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
+    final cached = await social.cachedComments(widget.postId);
+    if (cached != null && mounted) {
+      setState(() {
+        _apply(cached);
+        _loading = false;
+      });
+    }
     try {
-      final list = await social.fetchComments(widget.postId);
+      final fresh = await social.fetchComments(widget.postId);
       if (!mounted) return;
       setState(() {
-        _comments
-          ..clear()
-          ..addAll(list)
-          // Ordered on the device by the C++ core.
-          ..sort((a, b) => b.score.compareTo(a.score));
+        _apply(fresh);
         _loading = false;
+        _error = null;
       });
     } on DataException catch (e) {
       if (!mounted) return;
       setState(() {
         _loading = false;
-        _error = e.retryable ? "Can't reach the server." : e.message;
+        if (_comments.isEmpty) _error = e.retryable ? "Can't reach the server." : e.message;
       });
     }
   }
 
-  // ---- Actions: update now, send in the background ----
+  /// Replaces the list with [list] (ordered on the phone by the C++ core).
+  /// Comments that are still waiting to be sent stay at the top.
+  void _apply(List<CommentModel> list) {
+    final pending = _comments.where((c) => c.isPending).toList();
+    _comments
+      ..clear()
+      ..addAll(list)
+      ..sort((a, b) => b.score.compareTo(a.score));
+    for (final p in pending.reversed) {
+      _comments.insert(0, p);
+    }
+  }
+
+  // ---- Actions: update now, send through the outbox ----
 
   void _send() {
     final text = _input.text.trim();
@@ -95,18 +109,16 @@ class _CommentsSheetState extends State<CommentsSheet> {
       _input.clear();
     });
 
-    InteractionQueue.instance.enqueue<CommentModel>(
-      'comment:$tempId',
-      () {
-        // A reply waits until its parent comment has been saved.
-        final pid = parent?.id;
-        if (pid != null && pid.startsWith('tmp')) {
-          throw const DataException('Waiting for parent comment', retryable: true);
-        }
-        return social.addComment(widget.postId, text, parentId: pid);
-      },
-      onSuccess: (server) {
+    InteractionQueue.instance.enqueue(
+      OutboxOp('comment:$tempId', 'comment', {
+        'postId': widget.postId,
+        'text': text,
+        'parentId': parent?.id,
+        'tempId': tempId,
+      }),
+      onSuccess: (result) {
         if (!mounted) return;
+        final server = result as CommentModel;
         setState(() {
           temp.id = server.id;
           temp.time = server.time;
@@ -127,7 +139,7 @@ class _CommentsSheetState extends State<CommentsSheet> {
   }
 
   void _toggleLike(CommentModel c) {
-    if (c.isPending) return;
+    if (c.isPending) return; // saved on the server first
     final wasLiked = c.liked;
     final prevLikes = c.likes;
     final nowLiked = !wasLiked;
@@ -136,11 +148,11 @@ class _CommentsSheetState extends State<CommentsSheet> {
       c.likes += nowLiked ? 1 : -1;
     });
 
-    InteractionQueue.instance.enqueue<LikeResult>(
-      'clike:${c.id}',
-      () => social.setCommentLike(c.id, nowLiked),
-      onSuccess: (r) {
+    InteractionQueue.instance.enqueue(
+      OutboxOp('clike:${c.id}', 'commentLike', {'commentId': c.id, 'liked': nowLiked}),
+      onSuccess: (result) {
         if (!mounted) return;
+        final r = result as LikeResult;
         setState(() {
           c.liked = r.liked;
           c.likes = r.count;
@@ -157,7 +169,6 @@ class _CommentsSheetState extends State<CommentsSheet> {
   }
 
   void _startReply(CommentModel parent, {String? mention}) {
-    if (parent.isPending) return;
     setState(() {
       _replyTo = parent;
       _replyMention = mention;

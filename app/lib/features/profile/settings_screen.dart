@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../../core/auth/auth_service.dart';
+import '../../core/cache/local_cache.dart';
 import 'package:lucide_icons_flutter_plus/lucide_icons_flutter_plus.dart';
 import '../../core/theme/swifs_icon.dart';
 
@@ -118,9 +120,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
       ),
     );
     if (ok == true && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Logged out')),
-      );
+      await AuthService.signOut();
+      await LocalCache.instance.clearUserData();
+      if (!mounted) return;
+      Navigator.of(context).popUntil((route) => route.isFirst);
     }
   }
 

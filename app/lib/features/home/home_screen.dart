@@ -6,11 +6,13 @@ import 'dart:convert';
 import 'package:audioplayers/audioplayers.dart';
 import '../../core/theme/swifs_icon.dart';
 import 'package:lucide_icons_flutter_plus/lucide_icons_flutter_plus.dart';
-import '../../core/mocks/mock_feed.dart';
+import '../../core/data/models.dart';
+import '../../core/data/social.dart';
+import '../../core/network/interaction_queue.dart';
+import '../comments/comments_sheet.dart';
 import '../../core/native/swifs_ffi.dart';
 
 const Color kPrimary = Color(0xFFFF6B35);
-const String apiUrl = 'http://10.0.2.2:8000/api'; 
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -26,15 +28,12 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    _posts = mockPosts.map((p) => {
-      ...p, 
-      'isFollowing': false,
-      'isSaved': false,
-    }).toList();
+    _posts = [];
 
     // Preload audio for low latency
     _audioPlayer.setPlayerMode(PlayerMode.lowLatency);
     _audioPlayer.setSource(AssetSource('sounds/bubble_pop.mp3'));
+    _loadFeed();
   }
 
   @override
@@ -54,60 +53,131 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  void _handleLike(int index) {
-    final p = _posts[index];
-    final newLikedState = !p['liked'];
-    final newLikesCount = newLikedState ? p['likes'] + 1 : p['likes'] - 1;
-
-    if (newLikedState) _playPopSound();
-
-    int newScore = 0;
-    try {
-      newScore = SwifsCore.feedScore(newLikesCount, p['comments'], p['views'], p['age_minutes']);
-    } catch (e) {
-      print('C++ FFI not loaded: $e');
+  Map<String, dynamic>? _findPost(String id) {
+    for (final post in _posts) {
+      if (post['id'] == id) return post;
     }
+    return null;
+  }
+
+  void _rescore(Map<String, dynamic> post) {
+    post['score'] = SwifsScore.feed(
+      (post['likes'] as num).toInt(),
+      (post['comments'] as num).toInt(),
+      (post['views'] as num).toInt(),
+      (post['age_minutes'] as num).toInt(),
+    );
+  }
+
+  void _applyPost(String id, Map<String, dynamic> values) {
+    final post = _findPost(id);
+    if (post == null || !mounted) return;
+    setState(() {
+      post.addAll(values);
+      _rescore(post);
+    });
+  }
+
+  void _applyFollow(String authorId, bool following) {
+    if (!mounted) return;
+    setState(() {
+      for (final post in _posts) {
+        if (post['authorId'] == authorId) post['isFollowing'] = following;
+      }
+    });
+  }
+
+  List<Map<String, dynamic>> _sorted(List<Map<String, dynamic>> list) =>
+      list..sort((a, b) => (b['score'] as int).compareTo(a['score'] as int));
+
+  /// Offline first: show the saved feed at once, then update it from Supabase.
+  Future<void> _loadFeed() async {
+    final cached = await social.cachedFeed();
+    if (cached != null && mounted) {
+      setState(() => _posts = _sorted(cached.map((p) => p.toMap()).toList()));
+    }
+    try {
+      final fresh = await social.fetchFeed();
+      if (mounted) setState(() => _posts = _sorted(fresh.map((p) => p.toMap()).toList()));
+    } catch (_) {
+      // Offline: keep the saved posts on screen.
+    }
+  }
+
+  /// Refreshes counts after the comments sheet closes.
+  Future<void> _refreshCounts() async {
+    try {
+      final fresh = await social.fetchFeed();
+      if (!mounted) return;
+      final byId = {for (final p in fresh) p.id: p};
+      setState(() {
+        for (final post in _posts) {
+          final f = byId[post['id']];
+          if (f == null) continue;
+          post['comments'] = f.comments;
+          post['likes'] = f.likes;
+          _rescore(post);
+        }
+      });
+    } catch (_) {}
+  }
+
+  Future<void> _openComments(String postId) async {
+    await showCommentsSheet(context, postId: postId);
+    _refreshCounts();
+  }
+
+  void _handleLike(int index) {
+    final post = _posts[index];
+    final id = post['id'] as String;
+    final wasLiked = post['liked'] == true;
+    final prevLikes = (post['likes'] as num).toInt();
+    final prevScore = post['score'];
+    final nowLiked = !wasLiked;
+    if (nowLiked) _playPopSound();
 
     setState(() {
-      p['liked'] = newLikedState;
-      p['likes'] = newLikesCount;
+      post['liked'] = nowLiked;
+      post['likes'] = prevLikes + (nowLiked ? 1 : -1);
+      _rescore(post);
     });
 
-    _sendToApi('/like', {'post_id': p['id'], 'score': newScore});
+    InteractionQueue.instance.enqueue(
+      OutboxOp('like:$id', 'like', {'postId': id, 'liked': nowLiked}),
+      onSuccess: (result) {
+        final r = result as LikeResult;
+        _applyPost(id, {'liked': r.liked, 'likes': r.count});
+      },
+      onFail: (_) => _applyPost(id, {'liked': wasLiked, 'likes': prevLikes, 'score': prevScore}),
+    );
   }
 
   void _handleSave(int index) {
-    final p = _posts[index];
-    if (!p['isSaved']) _playPopSound();
-    
-    setState(() => p['isSaved'] = !p['isSaved']);
-    _sendToApi('/save', {'post_id': p['id']});
+    final post = _posts[index];
+    final id = post['id'] as String;
+    final wasSaved = post['isSaved'] == true;
+    final nowSaved = !wasSaved;
+    if (nowSaved) _playPopSound();
+    setState(() => post['isSaved'] = nowSaved);
+
+    InteractionQueue.instance.enqueue(
+      OutboxOp('save:$id', 'save', {'postId': id, 'saved': nowSaved}),
+      onSuccess: (result) => _applyPost(id, {'isSaved': result as bool}),
+      onFail: (_) => _applyPost(id, {'isSaved': wasSaved}),
+    );
   }
 
   void _handleFollow(int index) {
-    final p = _posts[index];
-    setState(() => p['isFollowing'] = !p['isFollowing']);
-    
-    int userHash = 0;
-    try {
-      userHash = SwifsCore.hashUser(p['user']);
-    } catch (e) {
-      print('C++ FFI not loaded: $e');
-    }
-    
-    _sendToApi('/follow', {'username': p['user'], 'user_hash': userHash});
-  }
+    final authorId = _posts[index]['authorId'] as String;
+    final wasFollowing = _posts[index]['isFollowing'] == true;
+    final nowFollowing = !wasFollowing;
+    _applyFollow(authorId, nowFollowing);
 
-  Future<void> _sendToApi(String endpoint, Map<String, dynamic> body) async {
-    try {
-      await http.post(
-        Uri.parse('$apiUrl$endpoint'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode(body),
-      );
-    } catch (e) {
-      // Ignore silently in UI if server is offline
-    }
+    InteractionQueue.instance.enqueue(
+      OutboxOp('follow:$authorId', 'follow', {'authorId': authorId, 'following': nowFollowing}),
+      onSuccess: (result) => _applyFollow(authorId, result as bool),
+      onFail: (_) => _applyFollow(authorId, wasFollowing),
+    );
   }
 
   @override
@@ -247,7 +317,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       icon: LucideIcons.messageCircle,
                       isActive: false,
                       activeColor: Colors.black,
-                      onTap: () {},
+                      onTap: () => _openComments(p['id']),
                     ),
                     const SizedBox(width: 4),
                     _AnimatedActionIcon(

@@ -7,10 +7,17 @@ import 'features/home/home_screen.dart';
 import 'features/explore/explore_screen.dart';
 import 'features/messages/messages_screen.dart';
 import 'features/profile/profile_screen.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'core/config/supabase_config.dart';
+import 'core/auth/auth_gate.dart';
+import 'core/network/interaction_queue.dart';
 
 const Color kPrimary = Color(0xFFFF6B35);
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Supabase.initialize(url: kSupabaseUrl, anonKey: kSupabaseAnonKey);
+  InteractionQueue.instance.restore();
   runApp(const ProviderScope(child: SwifsApp()));
 }
 
@@ -30,7 +37,7 @@ class SwifsApp extends StatelessWidget {
         highlightColor: Colors.transparent,
         splashColor: Colors.transparent,
       ),
-      home: const MainShell(),
+      home: const AuthGate(child: MainShell()),
     );
   }
 }

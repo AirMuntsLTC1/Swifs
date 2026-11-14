@@ -1,6 +1,6 @@
 import '../native/swifs_ffi.dart';
 
-/// The signed-in user. Stays "you" until a sign-in screen exists.
+/// Shown on a comment that has not reached the server yet.
 const String kCurrentUser = 'you';
 
 /// A failed data call. Network problems are retryable. Server rejections are not.
@@ -29,9 +29,29 @@ class LikeResult {
   const LikeResult({required this.liked, required this.count});
 }
 
+/// One action waiting to be sent. [key] replaces an older unsent action with the same key.
+class OutboxOp {
+  final String key;
+  final String kind;
+  final Map<String, dynamic> args;
+
+  const OutboxOp(this.key, this.kind, this.args);
+
+  Map<String, dynamic> toJson() => {'key': key, 'kind': kind, 'args': args};
+
+  factory OutboxOp.fromJson(Map<String, dynamic> j) => OutboxOp(
+        j['key'] as String,
+        j['kind'] as String,
+        Map<String, dynamic>.from(j['args'] as Map),
+      );
+}
+
 class FeedPost {
   final String id;
+  final String authorId;
   final String user;
+  final String displayName;
+  final String? avatarUrl;
   final String caption;
   final int views;
   final int ageMinutes;
@@ -43,7 +63,10 @@ class FeedPost {
 
   FeedPost({
     required this.id,
+    required this.authorId,
     required this.user,
+    required this.displayName,
+    required this.avatarUrl,
     required this.caption,
     required this.views,
     required this.ageMinutes,
@@ -54,27 +77,16 @@ class FeedPost {
     required this.isFollowing,
   });
 
-  /// Row from the Supabase get_feed() function.
-  factory FeedPost.fromRow(Map<String, dynamic> r) => FeedPost(
-        id: r['id'].toString(),
-        user: r['username'].toString(),
-        caption: r['caption']?.toString() ?? '',
-        views: (r['views'] as num?)?.toInt() ?? 0,
-        ageMinutes: (r['age_minutes'] as num?)?.toInt() ?? 0,
-        likes: (r['likes'] as num?)?.toInt() ?? 0,
-        comments: (r['comments'] as num?)?.toInt() ?? 0,
-        liked: r['liked'] == true,
-        isSaved: r['is_saved'] == true,
-        isFollowing: r['is_following'] == true,
-      );
-
   /// Ranking score from the C++ core.
   int get score => SwifsScore.feed(likes, comments, views, ageMinutes);
 
-  /// The shape the feed screen reads.
+  /// The shape the feed screen reads. Also what goes into the cache.
   Map<String, dynamic> toMap() => {
         'id': id,
+        'authorId': authorId,
         'user': user,
+        'displayName': displayName,
+        'avatarUrl': avatarUrl,
         'caption': caption,
         'time': formatAge(ageMinutes),
         'views': views,
@@ -86,11 +98,28 @@ class FeedPost {
         'isFollowing': isFollowing,
         'score': score,
       };
+
+  factory FeedPost.fromMap(Map<String, dynamic> m) => FeedPost(
+        id: m['id'].toString(),
+        authorId: m['authorId'].toString(),
+        user: m['user'].toString(),
+        displayName: (m['displayName'] ?? '').toString(),
+        avatarUrl: m['avatarUrl']?.toString(),
+        caption: (m['caption'] ?? '').toString(),
+        views: (m['views'] as num?)?.toInt() ?? 0,
+        ageMinutes: (m['age_minutes'] as num?)?.toInt() ?? 0,
+        likes: (m['likes'] as num?)?.toInt() ?? 0,
+        comments: (m['comments'] as num?)?.toInt() ?? 0,
+        liked: m['liked'] == true,
+        isSaved: m['isSaved'] == true,
+        isFollowing: m['isFollowing'] == true,
+      );
 }
 
 class CommentModel {
   String id;
   final String? parentId;
+  final String authorId;
   final String user;
   final String text;
   String time;
@@ -103,6 +132,7 @@ class CommentModel {
   CommentModel({
     required this.id,
     this.parentId,
+    this.authorId = '',
     required this.user,
     required this.text,
     required this.time,
@@ -113,26 +143,37 @@ class CommentModel {
     List<CommentModel>? replies,
   }) : replies = replies ?? [];
 
-  /// Row from the Supabase get_comments() function (flat list, replies have parent_id).
-  factory CommentModel.fromRow(Map<String, dynamic> r) {
-    final age = (r['age_minutes'] as num?)?.toInt() ?? 0;
-    return CommentModel(
-      id: r['id'].toString(),
-      parentId: r['parent_id']?.toString(),
-      user: r['username'].toString(),
-      text: r['body'].toString(),
-      time: formatAge(age),
-      ageMinutes: age,
-      likes: (r['likes'] as num?)?.toInt() ?? 0,
-      liked: r['liked'] == true,
-    );
-  }
-
-  /// Ids that start with tmp are not saved yet.
+  /// Ids that start with tmp have not reached the server yet.
   bool get isPending => id.startsWith('tmp');
 
   /// Ranking score from the C++ core.
   int get score => SwifsScore.comment(likes, replies.length, ageMinutes);
+
+  Map<String, dynamic> toFlat() => {
+        'id': id,
+        'parent_id': parentId,
+        'author_id': authorId,
+        'user': user,
+        'text': text,
+        'age_minutes': ageMinutes,
+        'likes': likes,
+        'liked': liked,
+      };
+
+  factory CommentModel.fromFlat(Map<String, dynamic> m) {
+    final age = (m['age_minutes'] as num?)?.toInt() ?? 0;
+    return CommentModel(
+      id: m['id'].toString(),
+      parentId: m['parent_id']?.toString(),
+      authorId: (m['author_id'] ?? '').toString(),
+      user: (m['user'] ?? 'user').toString(),
+      text: (m['text'] ?? '').toString(),
+      time: formatAge(age),
+      ageMinutes: age,
+      likes: (m['likes'] as num?)?.toInt() ?? 0,
+      liked: m['liked'] == true,
+    );
+  }
 }
 
 /// Turns a flat list into top-level comments, with each one's replies inside.
