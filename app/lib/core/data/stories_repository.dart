@@ -62,6 +62,7 @@ class StoryItem {
   final String photoUrl;
   final List<StoryLayer> layers;
   final DateTime createdAt;
+  final bool isVideo;
 
   const StoryItem({
     required this.id,
@@ -69,6 +70,7 @@ class StoryItem {
     required this.photoUrl,
     required this.layers,
     required this.createdAt,
+    this.isVideo = false,
   });
 }
 
@@ -125,7 +127,7 @@ class StoriesRepository {
 
     final rows = await _db
         .from('stories')
-        .select('id, author_id, photo_path, layers, created_at, expires_at')
+        .select('id, author_id, photo_path, layers, created_at, expires_at, media_type')
         .gt('expires_at', DateTime.now().toUtc().toIso8601String())
         .order('created_at', ascending: true);
     final list = rows.map((r) => Map<String, dynamic>.from(r)).toList();
@@ -167,6 +169,7 @@ class StoriesRepository {
         photoUrl: photo.isEmpty ? '' : _publicUrl(photo),
         layers: layers,
         createdAt: DateTime.tryParse(r['created_at'].toString()) ?? DateTime.now(),
+        isVideo: r['media_type']?.toString() == 'video',
       ));
       if (viewed.contains(id)) group.viewedIds.add(id);
     }
@@ -217,15 +220,15 @@ class StoriesRepository {
   }
 
   /// Starts sharing in the background. Returns at once so the screen can close and the ring can fill.
-  void startUpload({required File photo, required List<StoryLayer> layers}) {
+  void startUpload({required File photo, required List<StoryLayer> layers, bool isVideo = false}) {
     if (uploadProgress.value != null) {
       uploadError.value = 'Still sharing your last story. Try again in a moment.';
       return;
     }
-    unawaited(_upload(photo, layers.map((l) => l.copy()).toList()));
+    unawaited(_upload(photo, layers.map((l) => l.copy()).toList(), isVideo: isVideo));
   }
 
-  Future<void> _upload(File photo, List<StoryLayer> layers) async {
+  Future<void> _upload(File photo, List<StoryLayer> layers, {bool isVideo = false}) async {
     final me = _meOrNull;
     if (me == null) {
       uploadError.value = 'Please sign in to share a story.';
@@ -233,7 +236,13 @@ class StoriesRepository {
     }
 
     final id = const Uuid().v4();
-    final ext = photo.path.toLowerCase().endsWith('.png') ? 'png' : 'jpg';
+    final lower = photo.path.toLowerCase();
+    final ext = isVideo
+        ? (lower.endsWith('.mov') ? 'mov' : 'mp4')
+        : (lower.endsWith('.png') ? 'png' : 'jpg');
+    final contentType = isVideo
+        ? (ext == 'mov' ? 'video/quicktime' : 'video/mp4')
+        : (ext == 'png' ? 'image/png' : 'image/jpeg');
     final path = '$me/$id.$ext';
 
     uploadError.value = null;
@@ -248,17 +257,22 @@ class StoriesRepository {
     });
 
     try {
-      final bytes = await photo.readAsBytes();
       uploadProgress.value = 0.1;
-
-      await _db.storage.from(_bucket).uploadBinary(
-            path,
-            bytes,
-            fileOptions: FileOptions(
-              contentType: ext == 'png' ? 'image/png' : 'image/jpeg',
-              upsert: true,
-            ),
-          );
+      // Videos stream from disk (they can be large). Photos are small, so they are read in one go.
+      if (isVideo) {
+        await _db.storage.from(_bucket).upload(
+              path,
+              photo,
+              fileOptions: FileOptions(contentType: contentType, upsert: true),
+            );
+      } else {
+        final bytes = await photo.readAsBytes();
+        await _db.storage.from(_bucket).uploadBinary(
+              path,
+              bytes,
+              fileOptions: FileOptions(contentType: contentType, upsert: true),
+            );
+      }
 
       final now = DateTime.now().toUtc();
       await _db.from('stories').insert({
@@ -266,6 +280,7 @@ class StoriesRepository {
         'author_id': me,
         'bg_color': 0,
         'photo_path': path,
+        'media_type': isVideo ? 'video' : 'image',
         'photo_scale': 1.0,
         'photo_dx': 0.0,
         'photo_dy': 0.0,

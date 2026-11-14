@@ -77,7 +77,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
   }
 
   void _openPost(FeedPost post) {
-    Navigator.push(context, MaterialPageRoute(builder: (_) => PostViewerScreen(post: post)));
+    Navigator.push(context, slideRoute(PostViewerScreen(post: post)));
   }
 
   @override

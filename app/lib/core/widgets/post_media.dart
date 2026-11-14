@@ -8,6 +8,7 @@ import '../data/social.dart';
 import '../network/interaction_queue.dart';
 import '../theme/swifs_icon.dart';
 import 'swifs_skeleton.dart';
+import '../../features/messages/share_bottom_sheet.dart';
 import '../widgets/user_avatar.dart';
 import '../../features/comments/comments_sheet.dart';
 
@@ -99,7 +100,7 @@ class _PostMediaState extends State<PostMedia> {
       fit: StackFit.expand,
       children: [
         if (url.isEmpty)
-          Container(color: _kTile, child: const Center(child: SwifsIcon(LucideIcons.image, size: 48, color: Colors.grey)))
+          (_isVideo ? const VideoPosterTile() : Container(color: _kTile, child: const Center(child: SwifsIcon(LucideIcons.image, size: 48, color: Colors.grey))))
         else
           CachedNetworkImage(
             imageUrl: url,
@@ -180,7 +181,7 @@ class PostGridTile extends StatelessWidget {
         fit: StackFit.expand,
         children: [
           url.isEmpty
-              ? Container(color: _kTile, child: const Center(child: SwifsIcon(LucideIcons.image, color: Colors.grey)))
+              ? (post.mediaType == 'video' ? const VideoPosterTile() : Container(color: _kTile, child: const Center(child: SwifsIcon(LucideIcons.image, color: Colors.grey))))
               : CachedNetworkImage(
                   imageUrl: url, fit: BoxFit.cover,
                   placeholder: (_, __) => Container(color: _kTile),
@@ -216,6 +217,31 @@ String _formatViews(int views) {
   return views.toString();
 }
 
+/// Slides the new page in from the right, like Instagram. Use for opening a post.
+Route<T> slideRoute<T>(Widget page) => PageRouteBuilder<T>(
+      transitionDuration: const Duration(milliseconds: 280),
+      reverseTransitionDuration: const Duration(milliseconds: 220),
+      pageBuilder: (_, __, ___) => page,
+      transitionsBuilder: (_, animation, __, child) => SlideTransition(
+        position: Tween<Offset>(begin: const Offset(1, 0), end: Offset.zero)
+            .animate(CurvedAnimation(parent: animation, curve: Curves.easeOutCubic)),
+        child: child,
+      ),
+    );
+
+/// Dark tile with a play icon, for a video that has no thumbnail.
+class VideoPosterTile extends StatelessWidget {
+  const VideoPosterTile({super.key});
+
+  @override
+  Widget build(BuildContext context) => Container(
+        color: const Color(0xFF1C1C1E),
+        child: const Center(child: Icon(Icons.play_circle_fill, color: Colors.white70, size: 56)),
+      );
+}
+
+/// Full post view, opened from Find, profiles, saved and shared messages.
+/// Same icons and actions as the home feed: heart, comment, share and bookmark.
 class PostViewerScreen extends StatefulWidget {
   final FeedPost post;
   const PostViewerScreen({super.key, required this.post});
@@ -225,13 +251,12 @@ class PostViewerScreen extends StatefulWidget {
 }
 
 class _PostViewerScreenState extends State<PostViewerScreen> {
-  List<Map<String, dynamic>> _media = [];
-  int _currentIndex = 0;
   late bool _liked;
   late int _likes;
   late bool _saved;
-  bool _loading = true;
-  final PageController _pageController = PageController();
+  late int _comments;
+  List<Map<String, dynamic>> _media = const [];
+  bool _loadingMedia = false;
 
   @override
   void initState() {
@@ -239,22 +264,23 @@ class _PostViewerScreenState extends State<PostViewerScreen> {
     _liked = widget.post.liked;
     _likes = widget.post.likes;
     _saved = widget.post.isSaved;
-    _loadMedia();
+    _comments = widget.post.comments;
+    if (widget.post.media.isNotEmpty) {
+      _media = widget.post.media;
+    } else {
+      _loadingMedia = true;
+      _loadMedia();
+    }
   }
 
   Future<void> _loadMedia() async {
     try {
       final media = await social.fetchPostMedia(widget.post.id);
-      if (mounted) setState(() { _media = media; _loading = false; });
+      if (mounted) setState(() => _media = media);
     } catch (_) {
-      if (mounted) {
-        setState(() {
-          if (widget.post.mediaUrl != null) {
-            _media = [{'type': widget.post.mediaType ?? 'image', 'url': widget.post.mediaUrl, 'thumbUrl': widget.post.thumbUrl}];
-          }
-          _loading = false;
-        });
-      }
+      // Keep whatever is shown. The post still opens.
+    } finally {
+      if (mounted) setState(() => _loadingMedia = false);
     }
   }
 
@@ -265,7 +291,6 @@ class _PostViewerScreenState extends State<PostViewerScreen> {
       _liked = !wasLiked;
       _likes = prevLikes + (_liked ? 1 : -1);
     });
-
     InteractionQueue.instance.enqueue(
       OutboxOp('like:${widget.post.id}', 'like', {'postId': widget.post.id, 'liked': _liked}),
       onSuccess: (result) {
@@ -281,7 +306,6 @@ class _PostViewerScreenState extends State<PostViewerScreen> {
   void _toggleSave() {
     final wasSaved = _saved;
     setState(() => _saved = !wasSaved);
-
     InteractionQueue.instance.enqueue(
       OutboxOp('save:${widget.post.id}', 'save', {'postId': widget.post.id, 'saved': _saved}),
       onSuccess: (result) {
@@ -295,6 +319,7 @@ class _PostViewerScreenState extends State<PostViewerScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final ratio = postAspectRatio(_media.isEmpty ? null : _media.first);
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -313,84 +338,87 @@ class _PostViewerScreenState extends State<PostViewerScreen> {
           ],
         ),
       ),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator(color: _kPrimary))
-          : Column(
+      body: ListView(
+        children: [
+          _loadingMedia && _media.isEmpty
+              ? AspectRatio(aspectRatio: ratio, child: const SwifsSkeletonBox())
+              : PostCarousel(media: _media, ratio: ratio),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+            child: Row(
               children: [
-                Expanded(
-                  child: Stack(
-                    children: [
-                      PageView.builder(
-                        controller: _pageController,
-                        onPageChanged: (i) => setState(() => _currentIndex = i),
-                        itemCount: _media.length,
-                        itemBuilder: (_, i) {
-                          final m = _media[i];
-                          return PostMedia(url: m['url'], thumbUrl: m['thumbUrl'], type: m['type']);
-                        },
-                      ),
-                      if (_media.length > 1)
-                        Positioned(
-                          bottom: 12, left: 0, right: 0,
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: List.generate(_media.length, (i) {
-                              return Container(
-                                width: 6, height: 6,
-                                margin: const EdgeInsets.symmetric(horizontal: 3),
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  color: _currentIndex == i ? _kPrimary : Colors.grey.shade300,
-                                ),
-                              );
-                            }),
-                          ),
-                        ),
-                    ],
-                  ),
+                _ActionButton(
+                  onTap: _toggleLike,
+                  child: _liked
+                      ? const Icon(Icons.favorite, size: 28, color: Colors.red)
+                      : const SwifsIcon(LucideIcons.heart, size: 28, color: _kInk),
                 ),
-                Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          GestureDetector(
-                            onTap: _toggleLike,
-                            child: SwifsIcon(_liked ? LucideIcons.heart : LucideIcons.heart, size: 28, color: _liked ? Colors.red : _kInk),
-                          ),
-                          const SizedBox(width: 16),
-                          GestureDetector(
-                            onTap: () => showCommentsSheet(context, postId: widget.post.id),
-                            child: const SwifsIcon(LucideIcons.messageCircle, size: 28, color: _kInk),
-                          ),
-                          const SizedBox(width: 16),
-                          const SwifsIcon(LucideIcons.send, size: 28, color: _kInk),
-                          const Spacer(),
-                          GestureDetector(
-                            onTap: _toggleSave,
-                            child: SwifsIcon(LucideIcons.bookmark, size: 28, color: _saved ? _kPrimary : _kInk),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      Text('$_likes likes', style: const TextStyle(fontWeight: FontWeight.w600, color: _kInk)),
-                      const SizedBox(height: 4),
-                      Text.rich(TextSpan(children: [
-                        TextSpan(text: '@${widget.post.user} ', style: const TextStyle(fontWeight: FontWeight.w600, color: _kInk)),
-                        TextSpan(text: widget.post.caption, style: const TextStyle(color: _kInk)),
-                      ])),
-                      const SizedBox(height: 16),
-                    ],
+                _ActionButton(
+                  onTap: () => showCommentsSheet(context, postId: widget.post.id),
+                  child: const SwifsIcon(LucideIcons.messageCircle, size: 28, color: _kInk),
+                ),
+                _ActionButton(
+                  onTap: () => showModalBottomSheet(
+                    context: context,
+                    isScrollControlled: true,
+                    backgroundColor: Colors.transparent,
+                    builder: (_) => ShareBottomSheet(postId: widget.post.id),
                   ),
+                  child: const SwifsIcon(LucideIcons.upload, size: 28, color: _kInk),
+                ),
+                const Spacer(),
+                _ActionButton(
+                  onTap: _toggleSave,
+                  child: _saved
+                      ? const Icon(Icons.bookmark, size: 28, color: _kPrimary)
+                      : const SwifsIcon(LucideIcons.bookmark, size: 28, color: _kInk),
                 ),
               ],
             ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('$_likes likes', style: const TextStyle(fontWeight: FontWeight.w600, color: _kInk)),
+                const SizedBox(height: 4),
+                Text.rich(TextSpan(children: [
+                  TextSpan(text: '@${widget.post.user} ', style: const TextStyle(fontWeight: FontWeight.w600, color: _kInk)),
+                  TextSpan(text: widget.post.caption, style: const TextStyle(color: _kInk)),
+                ])),
+                if (_comments > 0) ...[
+                  const SizedBox(height: 6),
+                  GestureDetector(
+                    onTap: () => showCommentsSheet(context, postId: widget.post.id),
+                    child: Text('View all $_comments comments', style: const TextStyle(color: _kMuted, fontSize: 13)),
+                  ),
+                ],
+                const SizedBox(height: 24),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
 
+class _ActionButton extends StatelessWidget {
+  final VoidCallback onTap;
+  final Widget child;
+
+  const _ActionButton({required this.onTap, required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: SizedBox(width: 44, height: 44, child: Center(child: child)),
+    );
+  }
+}
 
 /// The feed's aspect ratio for a post, from its first media. Unknown size gives 4:5.
 double postAspectRatio(Map<String, dynamic>? m) {

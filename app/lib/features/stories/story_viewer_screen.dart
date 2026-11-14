@@ -8,6 +8,7 @@ import '../../core/widgets/user_avatar.dart';
 import 'story_layer_view.dart';
 import 'story_viewers_sheet.dart';
 import 'story_camera_screen.dart';
+import 'story_video_canvas.dart';
 
 const Color _kPrimary = Color(0xFFFF6B35);
 
@@ -145,10 +146,12 @@ class _StoryViewerScreenState extends State<StoryViewerScreen> with SingleTicker
             child: Center(
               child: story.photoUrl.isEmpty
                   ? const SizedBox.shrink()
-                  : StoryCanvas(
-                      image: CachedNetworkImageProvider(story.photoUrl),
-                      layers: story.layers,
-                    ),
+                  : story.isVideo
+                      ? StoryVideoCanvas(url: story.photoUrl)
+                      : StoryCanvas(
+                          image: CachedNetworkImageProvider(story.photoUrl),
+                          layers: story.layers,
+                        ),
             ),
           ),
           // Tap zones and hold-to-pause, under the header and footer

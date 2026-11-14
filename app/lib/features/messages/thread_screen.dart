@@ -8,6 +8,10 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/data/messages_repository.dart';
 import '../../core/theme/swifs_icon.dart';
 import '../../core/widgets/user_avatar.dart';
+import '../../core/widgets/post_media.dart';
+import '../../core/widgets/swifs_skeleton.dart';
+import '../../core/data/social.dart';
+import '../../core/data/models.dart';
 
 const Color _kPrimary = Color(0xFFFF6B35);
 const Color _kInk = Color(0xFF111111);
@@ -133,13 +137,13 @@ class _ThreadScreenState extends State<ThreadScreen> {
             if (m.id == tempId) saved else m,
         ];
       });
-    } catch (_) {
+    } catch (e) {
       if (!mounted) return;
       setState(() {
         temp.pending = false;
         temp.failed = true;
       });
-      _snack("Message didn't send. Tap it to try again.");
+      _snack("Didn't send: $e. Tap it to try again.");
     }
   }
 
@@ -472,7 +476,7 @@ class _ThreadScreenState extends State<ThreadScreen> {
 
     final content = <Widget>[];
     if (m.sharedPostId != null) {
-      content.add(SharedPostWidget(postId: m.sharedPostId!, mine: mine));
+      content.add(SharedPostWidget(postId: m.sharedPostId!, caption: m.text, mine: mine));
     }
     if (m.storyId != null) {
       content.add(
@@ -525,7 +529,8 @@ class _ThreadScreenState extends State<ThreadScreen> {
         ),
       );
     }
-    content.add(
+    // A shared post shows its caption inside the post card, so the text is not repeated.
+    if (m.sharedPostId == null) content.add(
       Text(
         m.text,
         style: TextStyle(color: mine ? Colors.white : _kInk, fontSize: 15, height: 1.3),
@@ -758,35 +763,71 @@ class _MessageMenu extends StatelessWidget {
 
 class SharedPostWidget extends StatelessWidget {
   final String postId;
+  final String caption;
   final bool mine;
-  const SharedPostWidget({super.key, required this.postId, required this.mine});
+  const SharedPostWidget({super.key, required this.postId, required this.caption, required this.mine});
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: 200,
-      margin: const EdgeInsets.only(bottom: 6),
-      decoration: BoxDecoration(
-        color: mine ? Colors.white24 : _kBubbleThem,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            height: 120,
+    final fg = mine ? Colors.white : _kInk;
+    return FutureBuilder<FeedPost?>(
+      future: social.fetchPostPreview(postId),
+      builder: (context, snap) {
+        final post = snap.data;
+        final loading = snap.connectionState == ConnectionState.waiting;
+        final thumb = post == null ? null : (post.thumbUrl ?? post.mediaUrl);
+        final ratio = postAspectRatio(post != null && post.media.isNotEmpty ? post.media.first : null);
+        return GestureDetector(
+          onTap: post == null ? null : () => Navigator.push(context, slideRoute(PostViewerScreen(post: post))),
+          child: Container(
+            width: 220,
+            margin: const EdgeInsets.only(bottom: 6),
+            clipBehavior: Clip.antiAlias,
             decoration: BoxDecoration(
-              color: Colors.grey.shade300,
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(8)),
+              color: mine ? Colors.white24 : _kBubbleThem,
+              borderRadius: BorderRadius.circular(12),
             ),
-            child: const Center(child: Icon(Icons.image, color: Colors.grey, size: 32)),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                AspectRatio(
+                  aspectRatio: ratio,
+                  child: loading || post == null
+                      ? const SwifsSkeletonBox()
+                      : thumb == null
+                          ? (post.mediaType == 'video'
+                              ? const VideoPosterTile()
+                              : Container(color: Colors.grey.shade300))
+                          : CachedNetworkImage(
+                              imageUrl: thumb,
+                              fit: BoxFit.cover,
+                              placeholder: (_, __) => const SwifsSkeletonBox(),
+                              errorWidget: (_, __, ___) => Container(color: Colors.grey.shade300),
+                            ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (post != null)
+                        Text('@${post.user}',
+                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: fg)),
+                      if (caption.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 2),
+                          child: Text(caption, style: TextStyle(fontSize: 14, height: 1.3, color: fg)),
+                        ),
+                      if (post == null && !loading)
+                        Text('Post no longer available', style: TextStyle(fontSize: 12, color: fg.withOpacity(0.7))),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
-          const Padding(
-            padding: EdgeInsets.all(8),
-            child: Text('Shared a post', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 }

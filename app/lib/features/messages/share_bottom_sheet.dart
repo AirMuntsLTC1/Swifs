@@ -48,8 +48,8 @@ class _ShareBottomSheetState extends State<ShareBottomSheet> {
     try {
       await _repo.sendPostToUsers(widget.postId, _caption.text.trim(), _selected.toList());
       if (mounted) Navigator.pop(context);
-    } catch (_) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Failed to send')));
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to send: $e')));
     } finally {
       if (mounted) setState(() => _sending = false);
     }

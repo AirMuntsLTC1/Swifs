@@ -723,6 +723,14 @@ class SupabaseSocialRepository implements SocialRepository {
     }
   }
 
+  @override
+  Future<FeedPost?> fetchPostPreview(String postId) => _guard(() async {
+        final rows = await _db.from('posts').select(_postSelect).eq('id', postId).limit(1);
+        if (rows.isEmpty) return null;
+        final list = await _hydrate(rows.map((e) => Map<String, dynamic>.from(e)).toList());
+        return list.isEmpty ? null : list.first;
+      });
+
   /// The real width and height of an image (0, 0 if it cannot be read).
   Future<(int, int)> _imageSize(File file) async {
     try {
@@ -771,7 +779,7 @@ class SupabaseSocialRepository implements SocialRepository {
             final isVideo = (item['type'] as String) == 'video';
             final file = File(path);
             final ext = _extOf(path, isVideo ? 'mp4' : 'jpg');
-            final storagePath = '$postId/$i.$ext';
+            final storagePath = '$me/$postId/$i.$ext';
 
             await bucket.upload(storagePath, file, fileOptions: FileOptions(contentType: _mime(ext), upsert: true));
             uploaded.add(storagePath);
@@ -779,7 +787,7 @@ class SupabaseSocialRepository implements SocialRepository {
             var width = 0;
             var height = 0;
             Uint8List? thumbBytes;
-            final thumbName = isVideo ? '$postId/$i-thumb.jpg' : '$postId/$i-thumb.png';
+            final thumbName = isVideo ? '$me/$postId/$i-thumb.jpg' : '$me/$postId/$i-thumb.png';
             if (isVideo) {
               thumbBytes = await VideoThumbnail.thumbnailData(
                 video: path,

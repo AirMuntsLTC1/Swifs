@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:lucide_icons_flutter_plus/lucide_icons_flutter_plus.dart';
 import 'package:photo_manager/photo_manager.dart';
+import '../../core/data/stories_repository.dart';
 import '../../core/theme/swifs_icon.dart';
 import 'story_review_screen.dart';
 
@@ -42,7 +43,7 @@ class _StoryCameraScreenState extends State<StoryCameraScreen> {
       });
       return;
     }
-    final paths = await PhotoManager.getAssetPathList(type: RequestType.image, onlyAll: true);
+    final paths = await PhotoManager.getAssetPathList(type: RequestType.common, onlyAll: true);
     final list = paths.isEmpty ? <AssetEntity>[] : await paths.first.getAssetListPaged(page: 0, size: 120);
     if (!mounted) return;
     setState(() {
@@ -77,6 +78,18 @@ class _StoryCameraScreenState extends State<StoryCameraScreen> {
     if (asset == null) return;
     final file = await asset.originFile;
     if (file == null || !mounted) return;
+    if (asset.type == AssetType.video) {
+      // Videos skip the photo editor. They upload in the background, like a photo story.
+      if (asset.duration > 15) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Video stories can be up to 15 seconds.')),
+        );
+        return;
+      }
+      StoriesRepository.instance.startUpload(photo: file, layers: const [], isVideo: true);
+      Navigator.of(context).popUntil((route) => route.isFirst);
+      return;
+    }
     _openReview(file);
   }
 
