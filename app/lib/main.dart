@@ -18,8 +18,21 @@ const Color kPrimary = Color(0xFFFF6B35);
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Supabase.initialize(url: kSupabaseUrl, anonKey: kSupabaseAnonKey);
-  InteractionQueue.instance.restore();
-  RealtimeNotificationService.instance.startListening();
+
+  // Realtime and the outbox run only for a signed-in user. Starting them before login
+  // (the old way) meant they never ran after a login made during the session.
+  void syncSession(Session? session) {
+    if (session != null) {
+      RealtimeHub.instance.start();
+      InteractionQueue.instance.restore();
+    } else {
+      RealtimeHub.instance.stop();
+    }
+  }
+
+  syncSession(Supabase.instance.client.auth.currentSession);
+  Supabase.instance.client.auth.onAuthStateChange.listen((state) => syncSession(state.session));
+
   runApp(const ProviderScope(child: SwifsApp()));
 }
 
@@ -166,5 +179,3 @@ class _MainShellState extends State<MainShell> {
     );
   }
 }
-
-

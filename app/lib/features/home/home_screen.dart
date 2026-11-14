@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../messages/share_bottom_sheet.dart';
 import '../profile/user_profile_screen.dart';
@@ -23,6 +24,8 @@ import '../comments/comments_sheet.dart';
 import '../create/create_post_screen.dart';
 import '../notifications/notifications_screen.dart';
 import '../../core/native/swifs_ffi.dart';
+import '../../core/notifications/realtime_notification_service.dart';
+import '../../core/widgets/swifs_skeleton.dart';
 
 const Color kPrimary = Color(0xFFFF6B35);
 
@@ -37,6 +40,15 @@ class _HomeScreenState extends State<HomeScreen> {
   final AudioPlayer _audioPlayer = AudioPlayer();
   final RefreshController _refreshController = RefreshController(initialRefresh: false);
   bool _loading = true;
+  static const int _pageSize = 10;
+  final ScrollController _scroll = ScrollController();
+  bool _loadingMore = false;
+  bool _hasMore = true;
+  Timer? _realtimeDebounce;
+  StreamSubscription<String>? _realtimeSub;
+  static const Set<String> _feedTables = {
+    'posts', 'post_media', 'post_likes', 'post_saves', 'comments', 'comment_likes', 'follows', 'profiles', 'blocked_users',
+  };
   List<StoryGroup> _groups = [];
   String? _myAvatar;
   String _myName = 'You';
@@ -66,6 +78,8 @@ class _HomeScreenState extends State<HomeScreen> {
     _posts = [];
 
     // Preload audio for low latency
+    _scroll.addListener(_onScroll);
+    _realtimeSub = RealtimeHub.instance.changes.listen(_onRealtime);
     _loadFeed();
     _loadStories();
     StoriesRepository.uploadProgress.addListener(_onStoryUploadChanged);
@@ -78,6 +92,9 @@ class _HomeScreenState extends State<HomeScreen> {
     StoriesRepository.uploadError.removeListener(_onStoryError);
     _audioPlayer.dispose();
     _refreshController.dispose();
+    _scroll.dispose();
+    _realtimeDebounce?.cancel();
+    _realtimeSub?.cancel();
     super.dispose();
   }
 
@@ -128,39 +145,109 @@ class _HomeScreenState extends State<HomeScreen> {
   List<Map<String, dynamic>> _sorted(List<Map<String, dynamic>> list) =>
       list..sort((a, b) => (b['score'] as int).compareTo(a['score'] as int));
 
-  /// Offline first: show the saved feed at once, then update it from Supabase.
+  /// Offline first: the saved first page shows at once, then the newest page loads from Supabase.
+  /// Newest first, like a photo feed. Later pages load as you scroll.
   Future<void> _loadFeed() async {
     final cached = await social.cachedFeed();
-    if (cached != null && mounted) {
-      setState(() => _posts = _sorted(cached.map((p) => p.toMap()).toList()));
+    if (cached != null && mounted && _posts.isEmpty) {
+      setState(() {
+        _posts = cached.map((p) => p.toMap()).toList();
+        _loading = false;
+      });
     }
     try {
-      final fresh = await social.fetchFeed();
-      if (mounted) setState(() => _posts = _sorted(fresh.map((p) => p.toMap()).toList()));
+      final fresh = await social.fetchFeedPage(limit: _pageSize);
+      if (mounted) {
+        setState(() {
+          _posts = fresh.map((p) => p.toMap()).toList();
+          _hasMore = fresh.length >= _pageSize;
+        });
+        // A short first page does not fill the screen, so load the next one now.
+        WidgetsBinding.instance.addPostFrameCallback((_) => _onScroll());
+      }
     } catch (_) {
-      // Offline: keep the saved posts on screen.
+      // Offline: keep what is on screen.
     } finally {
       if (mounted) setState(() => _loading = false);
     }
   }
 
-  /// Refreshes counts after the comments sheet closes.
-  Future<void> _refreshCounts() async {
+  /// Loads the next page of older posts.
+  Future<void> _loadMore() async {
+    if (_loadingMore || !_hasMore || _posts.isEmpty) return;
+    final before = DateTime.tryParse((_posts.last['created_at'] ?? '').toString());
+    if (before == null) return;
+    setState(() => _loadingMore = true);
     try {
-      final fresh = await social.fetchFeed();
+      final more = await social.fetchFeedPage(before: before, limit: _pageSize);
       if (!mounted) return;
-      final byId = {for (final p in fresh) p.id: p};
+      final known = {for (final p in _posts) p['id']};
       setState(() {
+        _posts.addAll(more.map((p) => p.toMap()).where((m) => !known.contains(m['id'])));
+        _hasMore = more.length >= _pageSize;
+      });
+    } catch (_) {
+      // Try again on the next scroll.
+    } finally {
+      if (mounted) setState(() => _loadingMore = false);
+    }
+  }
+
+  void _onScroll() {
+    if (!_scroll.hasClients) return;
+    if (_scroll.position.pixels > _scroll.position.maxScrollExtent - 600) {
+      _loadMore();
+    }
+  }
+
+  /// Realtime: a change to a feed table refreshes the newest page (after a short pause for bursts).
+  void _onRealtime(String table) {
+    if (!_feedTables.contains(table)) return;
+    _realtimeDebounce?.cancel();
+    _realtimeDebounce = Timer(const Duration(milliseconds: 400), () {
+      if (mounted) _syncNewest();
+    });
+  }
+
+  /// Fetches the newest page and merges it. New posts go on top. Existing posts get fresh counts,
+  /// names and photos. Like and save state is not overwritten, so an action still being sent does not flicker.
+  Future<void> _syncNewest() async {
+    try {
+      final fresh = await social.fetchFeedPage(limit: _pageSize);
+      if (!mounted) return;
+      final byId = {for (final p in fresh) p.id: p.toMap()};
+      setState(() {
+        final known = <String>{};
         for (final post in _posts) {
-          final f = byId[post['id']];
+          final id = post['id'] as String;
+          known.add(id);
+          final f = byId[id];
           if (f == null) continue;
-          post['comments'] = f.comments;
-          post['likes'] = f.likes;
+          post['likes'] = f['likes'];
+          post['comments'] = f['comments'];
+          post['views'] = f['views'];
+          post['user'] = f['user'];
+          post['displayName'] = f['displayName'];
+          post['avatarUrl'] = f['avatarUrl'];
+          final hasMedia = (post['media'] as List?)?.isNotEmpty ?? false;
+          if (!hasMedia) {
+            post['media'] = f['media'];
+            post['mediaUrl'] = f['mediaUrl'];
+            post['mediaType'] = f['mediaType'];
+            post['thumbUrl'] = f['thumbUrl'];
+          }
           _rescore(post);
         }
+        final newOnes = fresh.where((p) => !known.contains(p.id)).map((p) => p.toMap()).toList();
+        if (newOnes.isNotEmpty) _posts.insertAll(0, newOnes);
       });
-    } catch (_) {}
+    } catch (_) {
+      // Offline: keep the feed as it is.
+    }
   }
+
+  /// Refreshes counts after the comments sheet closes.
+  Future<void> _refreshCounts() => _syncNewest();
 
   Future<void> _openComments(String postId) async {
     await showCommentsSheet(context, postId: postId);
@@ -309,6 +396,19 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  /// The photos and videos of a post, in order. Falls back to the first media for older cached posts.
+  List<Map<String, dynamic>> _mediaOf(Map<String, dynamic> p) {
+    final raw = p['media'];
+    if (raw is List && raw.isNotEmpty) {
+      return raw.map((m) => Map<String, dynamic>.from(m as Map)).toList();
+    }
+    final url = p['mediaUrl'];
+    if (url == null) return const [];
+    return [
+      {'type': p['mediaType'] ?? 'image', 'url': url, 'thumbUrl': p['thumbUrl'], 'width': 0, 'height': 0},
+    ];
+  }
+
   void _openCamera() {
     Navigator.push(context, MaterialPageRoute(builder: (_) => const StoryCameraScreen()))
         .then((_) => _loadStories());
@@ -420,8 +520,10 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _feed() => _posts.isEmpty ? _emptyFeed() : ListView.builder(
-        itemCount: _posts.length,
+        controller: _scroll,
+        itemCount: _posts.length + (_hasMore ? 1 : 0),
         itemBuilder: (_, i) {
+          if (i >= _posts.length) return const FeedSkeleton(count: 1);
           final p = _posts[i];
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -466,13 +568,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ],
                 ),
               ),
-              if (p['mediaUrl'] != null)
-                PostMedia(url: p['mediaUrl']!, thumbUrl: p['thumbUrl'], type: p['mediaType'] ?? 'image')
-              else
-                Container(
-                  height: 350, color: const Color(0xFFF0F2F5),
-                  child: const Center(child: SwifsIcon(LucideIcons.image, size: 48, color: Colors.grey)),
-                ),
+              PostCarousel(media: _mediaOf(p), ratio: postAspectRatio(_mediaOf(p).isEmpty ? null : _mediaOf(p).first)),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
                 child: Row(
@@ -691,16 +787,18 @@ class _FloatingHeartsState extends State<_FloatingHearts> with SingleTickerProvi
 
 extension _EmptyFeedBuilder on _HomeScreenState {
   Widget _emptyFeed() {
+    if (_loading) {
+      return ListView(
+        physics: const NeverScrollableScrollPhysics(),
+        children: const [FeedSkeleton(count: 2)],
+      );
+    }
     return ListView(
       physics: const AlwaysScrollableScrollPhysics(),
-      children: [
+      children: const [
         SizedBox(
           height: 320,
-          child: Center(
-            child: _loading
-                ? const CircularProgressIndicator(color: kPrimary)
-                : const Text('No posts yet. Be the first to post.', style: TextStyle(color: Colors.grey)),
-          ),
+          child: Center(child: Text('No posts yet. Be the first to post.', style: TextStyle(color: Colors.grey))),
         ),
       ],
     );

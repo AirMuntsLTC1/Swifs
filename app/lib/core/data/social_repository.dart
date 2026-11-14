@@ -24,6 +24,8 @@ abstract class SocialRepository {
   // Feed
   Future<List<FeedPost>?> cachedFeed();
   Future<List<FeedPost>> fetchFeed();
+  /// One page, newest first. Pass [before] (created_at of the last post shown) for the next page.
+  Future<List<FeedPost>> fetchFeedPage({DateTime? before, int limit = 10});
 
   // Comments
   Future<List<CommentModel>?> cachedComments(String postId);

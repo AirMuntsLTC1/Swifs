@@ -10,6 +10,10 @@ import 'social_repository.dart';
 
 /// Reads and writes the Supabase tables: posts, post_media, profiles, comments,
 /// post_likes, post_saves, follows, comment_likes, trending_tags.
+/// Columns for a post row. Every column here must exist in the database (see the migration).
+const String _postSelect =
+    'id, author_id, text, likes, views, created_at, post_media(kind, storage_path, thumb_path, position, width, height)';
+
 class SupabaseSocialRepository implements SocialRepository {
   final LocalCache _cache = LocalCache.instance;
 
@@ -129,7 +133,7 @@ class SupabaseSocialRepository implements SocialRepository {
   Future<List<FeedPost>> fetchExplorePosts() => _guard(() async {
         final rows = await _db
             .from('posts')
-            .select('id, author_id, text, likes, views, created_at, post_media(kind, storage_path, thumb_path, position)')
+            .select(_postSelect)
             .order('likes', ascending: false)
             .limit(60);
         final posts = rows.map((e) => Map<String, dynamic>.from(e)).toList();
@@ -145,7 +149,7 @@ class SupabaseSocialRepository implements SocialRepository {
         if (clean.isEmpty) return <FeedPost>[];
         final rows = await _db
             .from('posts')
-            .select('id, author_id, text, likes, views, created_at, post_media(kind, storage_path, thumb_path, position)')
+            .select(_postSelect)
             .ilike('text', '%#$clean%')
             .order('created_at', ascending: false)
             .limit(60);
@@ -210,7 +214,7 @@ class SupabaseSocialRepository implements SocialRepository {
         final me = _me;
         final rows = await _db
             .from('posts')
-            .select('id, author_id, text, likes, views, created_at, post_media(kind, storage_path, thumb_path, position)')
+            .select(_postSelect)
             .eq('author_id', me)
             .order('created_at', ascending: false)
             .limit(60);
@@ -225,7 +229,7 @@ class SupabaseSocialRepository implements SocialRepository {
         if (ids.isEmpty) return <FeedPost>[];
         final rows = await _db
             .from('posts')
-            .select('id, author_id, text, likes, views, created_at, post_media(kind, storage_path, thumb_path, position)')
+            .select(_postSelect)
             .inFilter('id', ids);
         final byId = {for (final r in rows) r['id'].toString(): Map<String, dynamic>.from(r)};
         // Keep the order the user saved them in.
@@ -244,17 +248,41 @@ class SupabaseSocialRepository implements SocialRepository {
     return raw.map((e) => FeedPost.fromMap(Map<String, dynamic>.from(e as Map))).toList();
   }
 
+  /// Users I blocked, and users who blocked me. Their posts are hidden from the feed.
+  Future<Set<String>> _hiddenAuthors() async {
+    final me = _me;
+    final rows = await _db.from('blocked_users').select('blocker, blocked').or('blocker.eq.$me,blocked.eq.$me');
+    final out = <String>{};
+    for (final r in rows) {
+      final a = r['blocker'].toString();
+      final b = r['blocked'].toString();
+      out.add(a == me ? b : a);
+    }
+    return out;
+  }
+
+  /// One page of the feed, newest first. Only the first page is cached for offline use.
   @override
-  Future<List<FeedPost>> fetchFeed() => _guard(() async {
-        final rows = await _db
-            .from('posts')
-            .select('id, author_id, text, likes, views, created_at, post_media(kind, storage_path, thumb_path, position)')
-            .order('created_at', ascending: false)
-            .limit(50);
-        final list = await _hydrate(rows.map((e) => Map<String, dynamic>.from(e)).toList());
-        await _cache.write('cache.feed', list.map((p) => p.toMap()).toList());
+  Future<List<FeedPost>> fetchFeedPage({DateTime? before, int limit = 10}) => _guard(() async {
+        var query = _db.from('posts').select(_postSelect);
+        if (before != null) {
+          query = query.lt('created_at', before.toUtc().toIso8601String());
+        }
+        final rows = await query.order('created_at', ascending: false).limit(limit);
+        final hidden = await _hiddenAuthors();
+        final posts = rows
+            .map((e) => Map<String, dynamic>.from(e))
+            .where((p) => !hidden.contains(p['author_id'].toString()))
+            .toList();
+        final list = await _hydrate(posts);
+        if (before == null) {
+          await _cache.write('cache.feed', list.map((p) => p.toMap()).toList());
+        }
         return list;
       });
+
+  @override
+  Future<List<FeedPost>> fetchFeed() => fetchFeedPage(limit: 10);
 
   /// Turns raw post rows into FeedPost objects with author, counts, and my like/save/follow state.
   Future<List<FeedPost>> _hydrate(List<Map<String, dynamic>> posts) async {
@@ -299,6 +327,18 @@ class SupabaseSocialRepository implements SocialRepository {
         if (m['thumb_path'] != null) thumbUrl = _publicMediaUrl(m['thumb_path'].toString());
       }
 
+      final media = mediaList.map<Map<String, dynamic>>((m) {
+        final path = m['storage_path']?.toString();
+        final thumb = m['thumb_path']?.toString();
+        return {
+          'type': m['kind']?.toString() ?? 'image',
+          'url': path != null ? _publicMediaUrl(path) : null,
+          'thumbUrl': thumb != null ? _publicMediaUrl(thumb) : null,
+          'width': (m['width'] as num?)?.toInt() ?? 0,
+          'height': (m['height'] as num?)?.toInt() ?? 0,
+        };
+      }).where((m) => m['url'] != null).toList();
+
       return FeedPost(
         id: pid,
         authorId: aid,
@@ -316,6 +356,8 @@ class SupabaseSocialRepository implements SocialRepository {
         liked: liked.contains(pid),
         isSaved: saved.contains(pid),
         isFollowing: following.contains(aid),
+        createdAt: DateTime.tryParse((p['created_at'] ?? '').toString()),
+        media: media,
       );
     }).toList();
   }
@@ -550,7 +592,7 @@ class SupabaseSocialRepository implements SocialRepository {
   Future<List<FeedPost>> fetchUserPosts(String userId) => _guard(() async {
         final rows = await _db
             .from('posts')
-            .select('id, author_id, text, likes, views, created_at, post_media(kind, storage_path, thumb_path, position)')
+            .select(_postSelect)
             .eq('author_id', userId)
             .order('created_at', ascending: false)
             .limit(60);
@@ -681,65 +723,110 @@ class SupabaseSocialRepository implements SocialRepository {
     }
   }
 
-  @override
+  /// The real width and height of an image (0, 0 if it cannot be read).
+  Future<(int, int)> _imageSize(File file) async {
+    try {
+      final bytes = await file.readAsBytes();
+      final codec = await ui.instantiateImageCodec(bytes);
+      final frame = await codec.getNextFrame();
+      final size = (frame.image.width, frame.image.height);
+      frame.image.dispose();
+      return size;
+    } catch (_) {
+      return (0, 0);
+    }
+  }
+
+  /// The file's extension if we can store it, otherwise [fallback].
+  String _extOf(String path, String fallback) {
+    final dot = path.lastIndexOf('.');
+    if (dot < 0 || dot == path.length - 1) return fallback;
+    final ext = path.substring(dot + 1).toLowerCase();
+    const allowed = {'jpg', 'jpeg', 'png', 'webp', 'gif', 'mp4', 'm4v', 'mov', 'webm'};
+    return allowed.contains(ext) ? ext : fallback;
+  }
+
   @override
   Future<void> createPost(String caption, List<Map<String, dynamic>> media) => _guard(() async {
         final me = _me;
+        if (media.isEmpty) throw const DataException('Add at least one photo or video.');
+        if (media.length > kMaxPostMedia) {
+          throw DataException('You can add up to $kMaxPostMedia photos or videos per post.');
+        }
         final postId = const Uuid().v4();
-
-        await _db.from('posts').insert({
-          'id': postId,
-          'author_id': me,
-          'text': caption,
-          'likes': 0,
-          'created_at': DateTime.now().toUtc().toIso8601String(),
-        });
-
         final bucket = _db.storage.from('post-media');
-        for (int i = 0; i < media.length; i++) {
-          final item = media[i];
-          final path = item['path'] as String;
-          final kind = item['type'] as String;
-          final isVideo = kind == 'video';
-          final ext = isVideo ? 'mp4' : 'jpg';
-          final storagePath = '$postId/$i.$ext';
+        final uploaded = <String>[];
 
-          await bucket.upload(
-            storagePath,
-            File(path),
-            fileOptions: FileOptions(contentType: isVideo ? 'video/mp4' : 'image/jpeg', upsert: true),
-          );
-
-          String? thumbPath;
-          Uint8List? thumbBytes;
-          if (isVideo) {
-            thumbBytes = await VideoThumbnail.thumbnailData(
-              video: path,
-              imageFormat: ImageFormat.JPEG,
-              maxWidth: 480,
-              quality: 75,
-            );
-          } else {
-            thumbBytes = await _imageThumb(File(path));
-          }
-          if (thumbBytes != null) {
-            thumbPath = '$postId/$i-thumb.jpg';
-            await bucket.uploadBinary(
-              thumbPath,
-              thumbBytes,
-              fileOptions: FileOptions(contentType: 'image/jpeg', upsert: true),
-            );
-          }
-
-          await _db.from('post_media').insert({
-            'post_id': postId,
-            'position': i,
-            'kind': kind,
-            'storage_path': storagePath,
-            'thumb_path': thumbPath,
-            'width': 0,
-            'height': 0,
+        try {
+          await _db.from('posts').insert({
+            'id': postId,
+            'author_id': me,
+            'text': caption,
+            'created_at': DateTime.now().toUtc().toIso8601String(),
           });
+
+          for (int i = 0; i < media.length; i++) {
+            final item = media[i];
+            final path = item['path'] as String;
+            final isVideo = (item['type'] as String) == 'video';
+            final file = File(path);
+            final ext = _extOf(path, isVideo ? 'mp4' : 'jpg');
+            final storagePath = '$postId/$i.$ext';
+
+            await bucket.upload(storagePath, file, fileOptions: FileOptions(contentType: _mime(ext), upsert: true));
+            uploaded.add(storagePath);
+
+            var width = 0;
+            var height = 0;
+            Uint8List? thumbBytes;
+            final thumbName = isVideo ? '$postId/$i-thumb.jpg' : '$postId/$i-thumb.png';
+            if (isVideo) {
+              thumbBytes = await VideoThumbnail.thumbnailData(
+                video: path,
+                imageFormat: ImageFormat.JPEG,
+                maxWidth: 480,
+                quality: 75,
+              );
+            } else {
+              final size = await _imageSize(file);
+              width = size.$1;
+              height = size.$2;
+              thumbBytes = await _imageThumb(file);
+            }
+
+            String? thumbPath;
+            if (thumbBytes != null) {
+              // Thumbnails are PNG for images and JPEG for videos. The content type must match the bytes.
+              await bucket.uploadBinary(
+                thumbName,
+                thumbBytes,
+                fileOptions: FileOptions(contentType: isVideo ? 'image/jpeg' : 'image/png', upsert: true),
+              );
+              uploaded.add(thumbName);
+              thumbPath = thumbName;
+            }
+
+            await _db.from('post_media').insert({
+              'post_id': postId,
+              'position': i,
+              'kind': isVideo ? 'video' : 'image',
+              'storage_path': storagePath,
+              'thumb_path': thumbPath,
+              'width': width,
+              'height': height,
+            });
+          }
+        } catch (_) {
+          // Roll back, so no half-made post is left in the feed.
+          try {
+            await _db.from('posts').delete().eq('id', postId);
+          } catch (_) {}
+          if (uploaded.isNotEmpty) {
+            try {
+              await bucket.remove(uploaded);
+            } catch (_) {}
+          }
+          rethrow;
         }
       });
 }

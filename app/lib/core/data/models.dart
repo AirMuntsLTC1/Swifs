@@ -3,6 +3,9 @@ import '../native/swifs_ffi.dart';
 /// Shown on a comment that has not reached the server yet.
 const String kCurrentUser = 'you';
 
+/// Most photos or videos one post can hold (Instagram-style carousel).
+const int kMaxPostMedia = 10;
+
 /// A failed data call. Network problems are retryable. Server rejections are not.
 class DataException implements Exception {
   final String message;
@@ -63,6 +66,8 @@ class FeedPost {
   bool liked;
   bool isSaved;
   bool isFollowing;
+  final DateTime? createdAt;
+  final List<Map<String, dynamic>> media;
 
   FeedPost({
     required this.id,
@@ -81,6 +86,8 @@ class FeedPost {
     required this.liked,
     required this.isSaved,
     required this.isFollowing,
+    this.createdAt,
+    this.media = const [],
   });
 
   /// Ranking score from the C++ core.
@@ -106,6 +113,8 @@ class FeedPost {
         'isSaved': isSaved,
         'isFollowing': isFollowing,
         'score': score,
+        'created_at': createdAt?.toUtc().toIso8601String(),
+        'media': media,
       };
 
   factory FeedPost.fromMap(Map<String, dynamic> m) => FeedPost(
@@ -125,6 +134,8 @@ class FeedPost {
         liked: m['liked'] == true,
         isSaved: m['isSaved'] == true,
         isFollowing: m['isFollowing'] == true,
+        createdAt: DateTime.tryParse((m['created_at'] ?? '').toString()),
+        media: (m['media'] as List?)?.map((e) => Map<String, dynamic>.from(e as Map)).toList() ?? const [],
       );
 }
 

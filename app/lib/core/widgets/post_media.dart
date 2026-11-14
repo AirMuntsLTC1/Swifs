@@ -7,6 +7,7 @@ import '../data/models.dart';
 import '../data/social.dart';
 import '../network/interaction_queue.dart';
 import '../theme/swifs_icon.dart';
+import 'swifs_skeleton.dart';
 import '../widgets/user_avatar.dart';
 import '../../features/comments/comments_sheet.dart';
 
@@ -19,8 +20,10 @@ class PostMedia extends StatefulWidget {
   final String url;
   final String? thumbUrl;
   final String type;
+  /// Width divided by height. Instagram uses 4:5 (portrait) up to 1.91:1 (landscape).
+  final double ratio;
 
-  const PostMedia({super.key, required this.url, this.thumbUrl, required this.type});
+  const PostMedia({super.key, required this.url, this.thumbUrl, required this.type, this.ratio = 4 / 5});
 
   @override
   State<PostMedia> createState() => _PostMediaState();
@@ -101,7 +104,7 @@ class _PostMediaState extends State<PostMedia> {
           CachedNetworkImage(
             imageUrl: url,
             fit: BoxFit.cover,
-            placeholder: (_, __) => Container(color: _kTile, child: const Center(child: CircularProgressIndicator(color: _kPrimary, strokeWidth: 2))),
+            placeholder: (_, __) => const SwifsSkeletonBox(),
             errorWidget: (_, __, ___) => Container(color: _kTile, child: const Center(child: SwifsIcon(LucideIcons.image, size: 48, color: Colors.grey))),
           ),
         if (showPlay) const Center(child: Icon(Icons.play_circle_fill, size: 64, color: Colors.white70)),
@@ -115,7 +118,7 @@ class _PostMediaState extends State<PostMedia> {
       key: Key('media-${widget.url}'),
       onVisibilityChanged: _onVisibility,
       child: AspectRatio(
-        aspectRatio: 4 / 5,
+        aspectRatio: widget.ratio,
         child: _isVideo && _ready && _controller != null
             ? Stack(
                 fit: StackFit.expand,
@@ -384,6 +387,101 @@ class _PostViewerScreenState extends State<PostViewerScreen> {
                 ),
               ],
             ),
+    );
+  }
+}
+
+
+/// The feed's aspect ratio for a post, from its first media. Unknown size gives 4:5.
+double postAspectRatio(Map<String, dynamic>? m) {
+  final w = (m?['width'] as num?)?.toDouble() ?? 0;
+  final h = (m?['height'] as num?)?.toDouble() ?? 0;
+  if (w <= 0 || h <= 0) return 4 / 5;
+  return (w / h).clamp(4 / 5, 1.91).toDouble();
+}
+
+/// Instagram-style swipeable media for one post: dots, a 1/N counter, and one shape for every page.
+class PostCarousel extends StatefulWidget {
+  final List<Map<String, dynamic>> media;
+  final double ratio;
+
+  const PostCarousel({super.key, required this.media, required this.ratio});
+
+  @override
+  State<PostCarousel> createState() => _PostCarouselState();
+}
+
+class _PostCarouselState extends State<PostCarousel> {
+  int _index = 0;
+
+  Widget _page(Map<String, dynamic> m) => PostMedia(
+        url: m['url'].toString(),
+        thumbUrl: m['thumbUrl']?.toString(),
+        type: (m['type'] ?? 'image').toString(),
+        ratio: widget.ratio,
+      );
+
+  @override
+  Widget build(BuildContext context) {
+    final items = widget.media;
+    if (items.isEmpty) {
+      return AspectRatio(
+        aspectRatio: widget.ratio,
+        child: Container(
+          color: _kTile,
+          child: const Center(child: SwifsIcon(LucideIcons.image, size: 48, color: Colors.grey)),
+        ),
+      );
+    }
+    if (items.length == 1) return _page(items.first);
+
+    return AspectRatio(
+      aspectRatio: widget.ratio,
+      child: Stack(
+        children: [
+          PageView.builder(
+            itemCount: items.length,
+            onPageChanged: (i) => setState(() => _index = i),
+            itemBuilder: (_, i) => _page(items[i]),
+          ),
+          Positioned(
+            top: 10,
+            right: 10,
+            child: IgnorePointer(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(12)),
+                child: Text(
+                  '${_index + 1}/${items.length}',
+                  style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
+                ),
+              ),
+            ),
+          ),
+          Positioned(
+            bottom: 10,
+            left: 0,
+            right: 0,
+            child: IgnorePointer(
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: List.generate(
+                  items.length,
+                  (i) => Container(
+                    width: 6,
+                    height: 6,
+                    margin: const EdgeInsets.symmetric(horizontal: 3),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: _index == i ? _kPrimary : Colors.white70,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
