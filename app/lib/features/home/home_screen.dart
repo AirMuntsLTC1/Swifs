@@ -492,7 +492,14 @@ class _HomeScreenState extends State<HomeScreen> {
                       icon: LucideIcons.upload,
                       isActive: false,
                       activeColor: Colors.black,
-                      onTap: () {},
+                      onTap: () {
+                        showModalBottomSheet(
+                          context: context,
+                          isScrollControlled: true,
+                          backgroundColor: Colors.transparent,
+                          builder: (_) => ShareBottomSheet(postId: p['id']),
+                        );
+                      },
                     ),
                     const Spacer(),
                     _AnimatedActionIcon(

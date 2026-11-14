@@ -467,6 +467,9 @@ class _ThreadScreenState extends State<ThreadScreen> {
     final maxWidth = MediaQuery.of(context).size.width * 0.72;
 
     final content = <Widget>[];
+    if (m.sharedPostId != null) {
+      content.add(SharedPostWidget(postId: m.sharedPostId!, mine: mine));
+    }
     if (m.storyId != null) {
       content.add(
         FutureBuilder<String?>(
@@ -743,6 +746,42 @@ class _MessageMenu extends StatelessWidget {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+
+class SharedPostWidget extends StatelessWidget {
+  final String postId;
+  final bool mine;
+  const SharedPostWidget({super.key, required this.postId, required this.mine});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 200,
+      margin: const EdgeInsets.only(bottom: 6),
+      decoration: BoxDecoration(
+        color: mine ? Colors.white24 : _kBubbleThem,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            height: 120,
+            decoration: BoxDecoration(
+              color: Colors.grey.shade300,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(8)),
+            ),
+            child: const Center(child: Icon(Icons.image, color: Colors.grey, size: 32)),
+          ),
+          const Padding(
+            padding: EdgeInsets.all(8),
+            child: Text('Shared a post', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+          ),
+        ],
       ),
     );
   }

@@ -10,6 +10,8 @@ class DirectMessage {
   final DateTime? readAt;
   final String? replyToId;
   final String? storyId;
+  final String? sharedPostId;
+  final String? groupId;
   bool pending;
   bool failed;
   DateTime? pinnedAt;
@@ -27,6 +29,8 @@ class DirectMessage {
     this.readAt,
     this.replyToId,
     this.storyId,
+    this.sharedPostId,
+    this.groupId,
     this.pinnedAt,
     this.pending = false,
     this.failed = false,
@@ -98,6 +102,8 @@ class MessagesRepository {
         readAt: r['read_at'] == null ? null : DateTime.tryParse(r['read_at'].toString()),
         replyToId: r['reply_to_id']?.toString(),
         storyId: r['story_id']?.toString(),
+        sharedPostId: r['shared_post_id']?.toString(),
+        groupId: r['group_id']?.toString(),
         pinnedAt: r['pinned_at'] == null ? null : DateTime.tryParse(r['pinned_at'].toString())?.toLocal(),
       );
 
@@ -207,6 +213,50 @@ class MessagesRepository {
         .select(_select)
         .single();
     return _fromRow(Map<String, dynamic>.from(row));
+  }
+
+    Future<List<Map<String, dynamic>>> fetchMutualFollowers() async {
+    final me = _me;
+    final following = await _iFollow(me);
+    final followers = await _followsMe(me);
+    final mutual = following.intersection(followers).toList();
+    if (mutual.isEmpty) return [];
+    final profiles = await _db.from('profiles').select('id, username, display_name, avatar_url').inFilter('id', mutual);
+    return profiles.map((p) => Map<String, dynamic>.from(p)).toList();
+  }
+
+  Future<String> createGroup(String name, List<String> memberIds) async {
+    final me = _me;
+    final group = await _db.from('groups').insert({'name': name, 'admin_id': me}).select('id').single();
+    final groupId = group['id'].toString();
+    
+    final allMembers = [me, ...memberIds];
+    for (final uid in allMembers) {
+      await _db.from('group_members').insert({'group_id': groupId, 'user_id': uid});
+    }
+    return groupId;
+  }
+
+  Future<void> sendPostToUsers(String postId, String caption, List<String> userIds) async {
+    final me = _me;
+    for (final uid in userIds) {
+      await _db.from('messages').insert({
+        'sender': me,
+        'recipient': uid,
+        'text': caption,
+        'shared_post_id': postId,
+      });
+    }
+  }
+
+  Future<void> sendPostToGroup(String postId, String caption, String groupId) async {
+    final me = _me;
+    await _db.from('messages').insert({
+      'sender': me,
+      'group_id': groupId,
+      'text': caption,
+      'shared_post_id': postId,
+    });
   }
 
   Future<void> unsend(String messageId) async {

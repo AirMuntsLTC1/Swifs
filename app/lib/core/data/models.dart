@@ -246,3 +246,10 @@ class StoryViewerModel {
     this.reaction,
   });
 }
+
+class GroupModel {
+  final String id;
+  final String name;
+  final String adminId;
+  GroupModel({required this.id, required this.name, required this.adminId});
+}
