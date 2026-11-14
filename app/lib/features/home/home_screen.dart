@@ -12,6 +12,7 @@ import '../../core/data/models.dart';
 import '../../core/data/social.dart';
 import '../../core/network/interaction_queue.dart';
 import '../comments/comments_sheet.dart';
+import '../create/create_post_screen.dart';
 import '../../core/native/swifs_ffi.dart';
 
 const Color kPrimary = Color(0xFFFF6B35);
@@ -220,7 +221,24 @@ class _HomeScreenState extends State<HomeScreen> {
           children: [
             const Text('Swifs', style: TextStyle(fontSize: 26, fontWeight: FontWeight.w600, color: kPrimary)),
             Row(children: [
-              IconButton(icon: const SwifsIcon(LucideIcons.plus), onPressed: () {}),
+              IconButton(
+                icon: const SwifsIcon(LucideIcons.plus), 
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    PageRouteBuilder(
+                      pageBuilder: (_, __, ___) => const CreatePostScreen(),
+                      transitionsBuilder: (_, animation, __, child) {
+                        return SlideTransition(
+                          position: Tween<Offset>(begin: const Offset(0, 1), end: Offset.zero)
+                              .animate(CurvedAnimation(parent: animation, curve: Curves.easeOutCubic)),
+                          child: child,
+                        );
+                      },
+                    ),
+                  );
+                }
+              ),
               IconButton(icon: const SwifsIcon(LucideIcons.bell), onPressed: () {}),
             ]),
           ],

@@ -1,4 +1,6 @@
+import 'dart:io';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:uuid/uuid.dart';
 import '../cache/local_cache.dart';
 import 'models.dart';
 import 'social_repository.dart';
@@ -329,3 +331,41 @@ class SupabaseSocialRepository implements SocialRepository {
     throw DataException('Unknown action: ${op.kind}');
   }
 }
+
+
+  @override
+  Future<void> createPost(String caption, List<String> filePaths) async {
+    final me = _me;
+    final postId = const Uuid().v4();
+    
+    // 1. Insert the post into the database
+    await _db.from('posts').insert({
+      'id': postId,
+      'author_id': me,
+      'text': caption,
+      'likes': 0,
+      'created_at': DateTime.now().toUtc().toIso8601String(),
+    });
+
+    // 2. Upload files to Supabase Storage and save media records
+    for (int i = 0; i < filePaths.length; i++) {
+      final path = filePaths[i];
+      final ext = path.split('.').last;
+      final fileName = '$postId/$i.\$ext';
+      final file = File(path);
+
+      await _db.storage.from('post-media').upload(fileName, file);
+      
+      final publicUrl = _db.storage.from('post-media').getPublicUrl(fileName);
+      
+      await _db.from('post_media').insert({
+        'post_id': postId,
+        'position': i,
+        'kind': ext == 'mp4' || ext == 'mov' ? 'video' : 'image',
+        'storage_path': fileName,
+        'thumb_path': null,
+        'width': 0,
+        'height': 0,
+      });
+    }
+  }

@@ -23,4 +23,5 @@ abstract class SocialRepository {
 
   /// Runs one action from the outbox.
   Future<dynamic> run(OutboxOp op);
+  Future<void> createPost(String caption, List<String> filePaths);
 }
