@@ -88,7 +88,7 @@ class SupabaseSocialRepository implements SocialRepository {
         final me = _me;
         final postRows = await _db
             .from('posts')
-            .select('id, author_id, text, likes, created_at')
+            .select('id, author_id, text, likes, created_at, post_media(kind, storage_path, thumb_path)')
             .order('created_at', ascending: false)
             .limit(50);
         final posts = postRows.map((e) => Map<String, dynamic>.from(e)).toList();
@@ -119,6 +119,21 @@ class SupabaseSocialRepository implements SocialRepository {
           final pid = p['id'].toString();
           final aid = p['author_id'].toString();
           final profile = profiles[aid] ?? <String, dynamic>{};
+          final mediaList = p['post_media'] as List?;
+          String? mediaUrl;
+          String? mediaType;
+          String? thumbUrl;
+          if (mediaList != null && mediaList.isNotEmpty) {
+            final m = mediaList.first;
+            mediaType = m['kind'];
+            final baseUrl = Supabase.instance.client.rest.url.replaceAll('/rest/v1', '');
+            if (m['storage_path'] != null) {
+              mediaUrl = '$baseUrl/storage/v1/object/public/post-media/${m['storage_path']}';
+            }
+            if (m['thumb_path'] != null) {
+              thumbUrl = '$baseUrl/storage/v1/object/public/post-media/${m['thumb_path']}';
+            }
+          }
           return FeedPost(
             id: pid,
             authorId: aid,
@@ -126,6 +141,9 @@ class SupabaseSocialRepository implements SocialRepository {
             displayName: (profile['display_name'] ?? '').toString(),
             avatarUrl: profile['avatar_url']?.toString(),
             caption: (p['text'] ?? '').toString(),
+            mediaUrl: mediaUrl,
+            mediaType: mediaType,
+            thumbUrl: thumbUrl,
             views: 0,
             ageMinutes: _ageMinutes(p['created_at']),
             likes: (p['likes'] as num?)?.toInt() ?? 0,

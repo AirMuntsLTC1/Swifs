@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:video_player/video_player.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:pull_to_refresh_flutter3/pull_to_refresh_flutter3.dart';
 import '../../core/theme/swifs_refresh.dart';
 import 'package:http/http.dart' as http;
@@ -296,10 +298,13 @@ class _HomeScreenState extends State<HomeScreen> {
                   ],
                 ),
               ),
-              Container(
-                height: 350, color: const Color(0xFFF0F2F5),
-                child: const Center(child: SwifsIcon(LucideIcons.image, size: 48, color: Colors.grey)),
-              ),
+              if (p['mediaUrl'] != null)
+                PostMedia(url: p['mediaUrl']!, thumbUrl: p['thumbUrl'], type: p['mediaType'] ?? 'image')
+              else
+                Container(
+                  height: 350, color: const Color(0xFFF0F2F5),
+                  child: const Center(child: SwifsIcon(LucideIcons.image, size: 48, color: Colors.grey)),
+                ),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
                 child: Row(
@@ -505,6 +510,118 @@ class _FloatingHeartsState extends State<_FloatingHearts> with SingleTickerProvi
           ),
         );
       },
+    );
+  }
+}
+
+
+class PostMedia extends StatefulWidget {
+  final String url;
+  final String? thumbUrl;
+  final String type;
+
+  const PostMedia({super.key, required this.url, this.thumbUrl, required this.type});
+
+  @override
+  State<PostMedia> createState() => _PostMediaState();
+}
+
+class _PostMediaState extends State<PostMedia> {
+  VideoPlayerController? _controller;
+  bool _isPlaying = false;
+  bool _isMuted = true;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.type == 'video') {
+      _controller = VideoPlayerController.networkUrl(Uri.parse(widget.url))
+        ..initialize().then((_) {
+          _controller!.setVolume(0); // Default muted
+          _controller!.setLooping(true);
+          setState(() {});
+        });
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller?.dispose();
+    super.dispose();
+  }
+
+  void _togglePlay() {
+    if (_controller == null) return;
+    setState(() {
+      if (_controller!.value.isPlaying) {
+        _controller!.pause();
+      } else {
+        _controller!.play();
+      }
+    });
+  }
+
+  void _toggleMute() {
+    if (_controller == null) return;
+    setState(() {
+      _isMuted = !_isMuted;
+      _controller!.setVolume(_isMuted ? 0 : 1);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (widget.type == 'video' && _controller != null && _controller!.value.isInitialized) {
+      return AspectRatio(
+        aspectRatio: 4 / 5, // Instagram style aspect ratio
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            VideoPlayer(_controller!),
+            GestureDetector(
+              onTap: _togglePlay,
+              child: Container(
+                color: Colors.transparent,
+                child: Center(
+                  child: AnimatedOpacity(
+                    opacity: _controller!.value.isPlaying ? 0.0 : 1.0,
+                    duration: const Duration(milliseconds: 200),
+                    child: const Icon(Icons.play_arrow, size: 64, color: Colors.white),
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              bottom: 12,
+              right: 12,
+              child: GestureDetector(
+                onTap: _toggleMute,
+                child: Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(20)),
+                  child: Icon(_isMuted ? Icons.volume_off : Icons.volume_up, color: Colors.white, size: 20),
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return AspectRatio(
+      aspectRatio: 4 / 5,
+      child: CachedNetworkImage(
+        imageUrl: widget.thumbUrl ?? widget.url,
+        fit: BoxFit.cover,
+        placeholder: (context, url) => Container(
+          color: const Color(0xFFF0F2F5),
+          child: const Center(child: CircularProgressIndicator(color: Color(0xFFFF6B35))),
+        ),
+        errorWidget: (context, url, error) => Container(
+          color: const Color(0xFFF0F2F5),
+          child: const Center(child: SwifsIcon(LucideIcons.image, size: 48, color: Colors.grey)),
+        ),
+      ),
     );
   }
 }

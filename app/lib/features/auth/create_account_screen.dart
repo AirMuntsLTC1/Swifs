@@ -17,7 +17,6 @@ class CreateAccountScreen extends StatefulWidget {
 class _CreateAccountScreenState extends State<CreateAccountScreen> {
   static final RegExp _emailPattern = RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$');
 
-  final _displayName = TextEditingController();
   final _firstName = TextEditingController();
   final _lastName = TextEditingController();
   final _email = TextEditingController();
@@ -32,8 +31,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
 
   @override
   void dispose() {
-    _displayName.dispose();
-    _firstName.dispose();
+      _firstName.dispose();
     _lastName.dispose();
     _email.dispose();
     _password.dispose();
@@ -41,8 +39,9 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
   }
 
   String get _emailValue => _email.text.trim().toLowerCase();
-  bool get _nameFilled =>
-      _displayName.text.trim().isNotEmpty && _firstName.text.trim().isNotEmpty && _lastName.text.trim().isNotEmpty;
+  bool get _isFirstNameValid => _firstName.text.isEmpty || _firstName.text[0] == _firstName.text[0].toUpperCase();
+  bool get _isLastNameValid => _lastName.text.isEmpty || _lastName.text[0] == _lastName.text[0].toUpperCase();
+  bool get _nameFilled => _firstName.text.trim().isNotEmpty && _lastName.text.trim().isNotEmpty && _isFirstNameValid && _isLastNameValid;
 
   void _rebuild() => setState(() {});
 
@@ -89,7 +88,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
           await AuthService.sendSignupCode(
             email: _emailValue,
             username: _username,
-            displayName: _displayName.text.trim(),
+            displayName: '${_firstName.text.trim()} ${_lastName.text.trim()}',
             firstName: _firstName.text.trim(),
             lastName: _lastName.text.trim(),
           );
@@ -148,34 +147,37 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
               subtitle: 'Your display name is how people see you. Your first and last name stay private.',
             ),
             const SizedBox(height: 28),
-            AuthField(
-              controller: _displayName,
-              hint: 'Display name',
-              capitalization: TextCapitalization.words,
-              action: TextInputAction.next,
-              maxLength: 60,
-              onChanged: (_) => _rebuild(),
-            ),
-            const SizedBox(height: 12),
             Row(
               children: [
                 Expanded(
-                  child: AuthField(
-                    controller: _firstName,
-                    hint: 'First name',
-                    capitalization: TextCapitalization.words,
-                    action: TextInputAction.next,
-                    onChanged: (_) => _rebuild(),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(28),
+                      border: Border.all(color: _isFirstNameValid ? Colors.transparent : Colors.red, width: 1.5),
+                    ),
+                    child: AuthField(
+                      controller: _firstName,
+                      hint: 'First name',
+                      capitalization: TextCapitalization.words,
+                      action: TextInputAction.next,
+                      onChanged: (_) => _rebuild(),
+                    ),
                   ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: AuthField(
-                    controller: _lastName,
-                    hint: 'Last name',
-                    capitalization: TextCapitalization.words,
-                    action: TextInputAction.next,
-                    onChanged: (_) => _rebuild(),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(28),
+                      border: Border.all(color: _isLastNameValid ? Colors.transparent : Colors.red, width: 1.5),
+                    ),
+                    child: AuthField(
+                      controller: _lastName,
+                      hint: 'Last name',
+                      capitalization: TextCapitalization.words,
+                      action: TextInputAction.next,
+                      onChanged: (_) => _rebuild(),
+                    ),
                   ),
                 ),
               ],

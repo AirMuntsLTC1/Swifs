@@ -53,6 +53,9 @@ class FeedPost {
   final String displayName;
   final String? avatarUrl;
   final String caption;
+  final String? mediaUrl;
+  final String? mediaType;
+  final String? thumbUrl;
   final int views;
   final int ageMinutes;
   int likes;
@@ -68,6 +71,9 @@ class FeedPost {
     required this.displayName,
     required this.avatarUrl,
     required this.caption,
+    this.mediaUrl,
+    this.mediaType,
+    this.thumbUrl,
     required this.views,
     required this.ageMinutes,
     required this.likes,
@@ -88,6 +94,9 @@ class FeedPost {
         'displayName': displayName,
         'avatarUrl': avatarUrl,
         'caption': caption,
+        'mediaUrl': mediaUrl,
+        'mediaType': mediaType,
+        'thumbUrl': thumbUrl,
         'time': formatAge(ageMinutes),
         'views': views,
         'age_minutes': ageMinutes,
@@ -106,6 +115,9 @@ class FeedPost {
         displayName: (m['displayName'] ?? '').toString(),
         avatarUrl: m['avatarUrl']?.toString(),
         caption: (m['caption'] ?? '').toString(),
+        mediaUrl: m['mediaUrl']?.toString(),
+        mediaType: m['mediaType']?.toString(),
+        thumbUrl: m['thumbUrl']?.toString(),
         views: (m['views'] as num?)?.toInt() ?? 0,
         ageMinutes: (m['age_minutes'] as num?)?.toInt() ?? 0,
         likes: (m['likes'] as num?)?.toInt() ?? 0,
