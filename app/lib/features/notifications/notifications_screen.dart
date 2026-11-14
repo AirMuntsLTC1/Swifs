@@ -85,6 +85,41 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     );
   }
 
+  Future<void> _confirmDeleteAll() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Delete all notifications?'),
+        content: const Text("This removes every notification from your account. It can't be undone."),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel', style: TextStyle(color: Colors.black, fontWeight: FontWeight.w600)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Yes', style: TextStyle(color: Colors.red, fontWeight: FontWeight.w600)),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+
+    final previous = _items;
+    setState(() => _items = []);
+    try {
+      await social.deleteAllNotifications();
+      UnreadCounts.instance.notifications.value = 0;
+    } catch (e) {
+      if (mounted) {
+        setState(() => _items = previous);
+        final text = e is DataException ? e.message : "Couldn't delete notifications.";
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+      }
+    }
+  }
+
   void _showSafetyNotice(NotificationModel item) {
     showModalBottomSheet(
       context: context,
@@ -112,6 +147,13 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           onPressed: () => Navigator.pop(context),
         ),
         title: const Text('Notifications', style: TextStyle(color: kInk, fontSize: 18, fontWeight: FontWeight.w600)),
+        actions: [
+          if (!_loading && _items.isNotEmpty)
+            TextButton(
+              onPressed: _confirmDeleteAll,
+              child: const Text('Delete all', style: TextStyle(color: Colors.red, fontWeight: FontWeight.w600)),
+            ),
+        ],
       ),
       body: _loading
           ? const ListRowsSkeleton()
@@ -281,5 +323,7 @@ class _ActionSheet extends StatelessWidget {
     );
   }
 }
+
+
 
 

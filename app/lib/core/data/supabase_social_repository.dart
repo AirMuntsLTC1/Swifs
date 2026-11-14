@@ -685,6 +685,17 @@ class SupabaseSocialRepository implements SocialRepository {
   // Notifications
   // ------------------------------------------------------------------
 
+  @override
+  Future<void> deleteAllNotifications() => _guard(() async {
+        final me = _me;
+        await _db.from('notifications').delete().eq('user_id', me);
+        // Row-level security silently skips rows it refuses, so confirm the table is empty for this user.
+        final left = await _db.from('notifications').select('id').eq('user_id', me).limit(1);
+        if (left.isNotEmpty) {
+          throw const DataException("Couldn't delete every notification. Try again.", retryable: true);
+        }
+      });
+
   /// The username without any leading @, so "@kurt" and "kurt" match the same profile.
   String _cleanHandle(Object? raw) => (raw ?? '').toString().trim().replaceFirst(RegExp(r'^@+'), '');
 
@@ -959,3 +970,5 @@ class SupabaseSocialRepository implements SocialRepository {
     };
   }
 }
+
+

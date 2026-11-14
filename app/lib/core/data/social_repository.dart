@@ -48,6 +48,8 @@ abstract class SocialRepository {
   Future<dynamic> run(OutboxOp op);
 
   Future<List<NotificationModel>> fetchNotifications();
+  /// Deletes every notification for the signed-in user, then checks that none remain.
+  Future<void> deleteAllNotifications();
   Future<Map<String, dynamic>> fetchUserProfile(String userId);
   Future<List<FeedPost>> fetchUserPosts(String userId);
   Future<void> blockUser(String userId);
@@ -59,3 +61,5 @@ abstract class SocialRepository {
   Future<void> restrictUser(String userId);
 
 }
+
+
