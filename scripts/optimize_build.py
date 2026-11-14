@@ -9,8 +9,8 @@ if not p.exists():
 s = p.read_text()
 
 # 1. Force compileSdk to 35 to support audioplayers (handles any flutter default)
-s = re.sub(r'compileSdk\s*=\s*[^\n]+', 'compileSdk = 35', s)
-s = re.sub(r'compileSdkVersion\s*[^\n]+', 'compileSdkVersion 35', s)
+s = re.sub(r'compileSdk\s*=\s*[^\n]+', 'compileSdk = 36', s)
+s = re.sub(r'compileSdkVersion\s*[^\n]+', 'compileSdkVersion 36', s)
 
 # 2. Apply size optimizations (packagingOptions)
 block = '''    packagingOptions {

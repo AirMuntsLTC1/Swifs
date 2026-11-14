@@ -4,14 +4,17 @@ import 'package:lucide_icons_flutter_plus/lucide_icons_flutter_plus.dart';
 import 'package:video_player/video_player.dart';
 import 'package:visibility_detector/visibility_detector.dart';
 import '../data/models.dart';
+import '../data/social.dart';
+import '../network/interaction_queue.dart';
 import '../theme/swifs_icon.dart';
+import '../widgets/user_avatar.dart';
+import '../../features/comments/comments_sheet.dart';
 
 const Color _kPrimary = Color(0xFFFF6B35);
 const Color _kTile = Color(0xFFF0F2F5);
+const Color _kInk = Color(0xFF111111);
+const Color _kMuted = Color(0xFF8E8E93);
 
-/// A post's photo or video in the feed. Photos show the thumbnail first, then the full image.
-/// Videos show the thumbnail, then play automatically while at least 60% of them is on screen,
-/// and pause when they scroll away.
 class PostMedia extends StatefulWidget {
   final String url;
   final String? thumbUrl;
@@ -37,18 +40,15 @@ class _PostMediaState extends State<PostMedia> {
     if (!_isVideo || _controller != null) return;
     final c = VideoPlayerController.networkUrl(Uri.parse(widget.url));
     _controller = c;
-    c
-        .initialize()
-        .then((_) {
-          if (!mounted) return;
-          c.setLooping(true);
-          c.setVolume(_muted ? 0 : 1);
-          setState(() => _ready = true);
-          if (_visible && !_userPaused) c.play();
-        })
-        .catchError((_) {
-          if (mounted) setState(() => _failed = true);
-        });
+    c.initialize().then((_) {
+      if (!mounted) return;
+      c.setLooping(true);
+      c.setVolume(_muted ? 0 : 1);
+      setState(() => _ready = true);
+      if (_visible && !_userPaused) c.play();
+    }).catchError((_) {
+      if (mounted) setState(() => _failed = true);
+    });
   }
 
   void _onVisibility(VisibilityInfo info) {
@@ -101,17 +101,10 @@ class _PostMediaState extends State<PostMedia> {
           CachedNetworkImage(
             imageUrl: url,
             fit: BoxFit.cover,
-            placeholder: (_, __) => Container(
-              color: _kTile,
-              child: const Center(child: CircularProgressIndicator(color: _kPrimary, strokeWidth: 2)),
-            ),
-            errorWidget: (_, __, ___) => Container(
-              color: _kTile,
-              child: const Center(child: SwifsIcon(LucideIcons.image, size: 48, color: Colors.grey)),
-            ),
+            placeholder: (_, __) => Container(color: _kTile, child: const Center(child: CircularProgressIndicator(color: _kPrimary, strokeWidth: 2))),
+            errorWidget: (_, __, ___) => Container(color: _kTile, child: const Center(child: SwifsIcon(LucideIcons.image, size: 48, color: Colors.grey))),
           ),
-        if (showPlay)
-          const Center(child: Icon(Icons.play_circle_fill, size: 64, color: Colors.white70)),
+        if (showPlay) const Center(child: Icon(Icons.play_circle_fill, size: 64, color: Colors.white70)),
       ],
     );
   }
@@ -146,8 +139,7 @@ class _PostMediaState extends State<PostMedia> {
                     ),
                   ),
                   Positioned(
-                    bottom: 12,
-                    right: 12,
+                    bottom: 12, right: 12,
                     child: GestureDetector(
                       onTap: _toggleMute,
                       child: Container(
@@ -168,7 +160,6 @@ class _PostMediaState extends State<PostMedia> {
   }
 }
 
-/// One square tile in a grid of posts. Shows the thumbnail that the server stored.
 class PostGridTile extends StatelessWidget {
   final FeedPost post;
   final VoidCallback onTap;
@@ -188,23 +179,15 @@ class PostGridTile extends StatelessWidget {
           url.isEmpty
               ? Container(color: _kTile, child: const Center(child: SwifsIcon(LucideIcons.image, color: Colors.grey)))
               : CachedNetworkImage(
-                  imageUrl: url,
-                  fit: BoxFit.cover,
+                  imageUrl: url, fit: BoxFit.cover,
                   placeholder: (_, __) => Container(color: _kTile),
-                  errorWidget: (_, __, ___) =>
-                      Container(color: _kTile, child: const Center(child: SwifsIcon(LucideIcons.image, color: Colors.grey))),
+                  errorWidget: (_, __, ___) => Container(color: _kTile, child: const Center(child: SwifsIcon(LucideIcons.image, color: Colors.grey))),
                 ),
           if (post.mediaType == 'video')
-            const Positioned(
-              top: 6,
-              right: 6,
-              child: Icon(Icons.play_circle_fill, color: Colors.white, size: 20),
-            ),
-          // Views badge (Instagram style)
+            const Positioned(top: 6, right: 6, child: Icon(Icons.play_circle_fill, color: Colors.white, size: 20)),
           if (post.views > 0)
             Positioned(
-              bottom: 6,
-              left: 6,
+              bottom: 6, left: 6,
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(12)),
@@ -213,10 +196,7 @@ class PostGridTile extends StatelessWidget {
                   children: [
                     const Icon(Icons.play_arrow, color: Colors.white, size: 14),
                     const SizedBox(width: 2),
-                    Text(
-                      _formatViews(post.views),
-                      style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600),
-                    ),
+                    Text(_formatViews(post.views), style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600)),
                   ],
                 ),
               ),
@@ -227,76 +207,11 @@ class PostGridTile extends StatelessWidget {
   }
 }
 
-/// Full-screen view of one post: media, author, caption, and counts.
-class PostViewerScreen extends StatelessWidget {
-  final FeedPost post;
-
-  const PostViewerScreen({super.key, required this.post});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        surfaceTintColor: Colors.white,
-        elevation: 0,
-        leading: IconButton(
-          icon: const SwifsIcon(LucideIcons.arrowLeft, color: Color(0xFF111111)),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: Text(
-          '@${post.user}',
-          style: const TextStyle(color: Color(0xFF111111), fontSize: 16, fontWeight: FontWeight.w700),
-        ),
-      ),
-      body: ListView(
-        children: [
-          if (post.mediaUrl != null)
-            PostMedia(url: post.mediaUrl!, thumbUrl: post.thumbUrl, type: post.mediaType ?? 'image')
-          else
-            Container(height: 300, color: _kTile),
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Text.rich(TextSpan(children: [
-              TextSpan(text: '@${post.user} ', style: const TextStyle(fontWeight: FontWeight.w600)),
-              TextSpan(text: post.caption),
-            ])),
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Text(
-              '${post.likes} likes · ${post.comments} comments',
-              style: const TextStyle(color: Colors.grey, fontSize: 13),
-            ),
-          ),
-          const SizedBox(height: 24),
-        ],
-      ),
-    );
-  }
-}
-
 String _formatViews(int views) {
-  if (views >= 1000000) return '\${(views / 1000000).toStringAsFixed(1)}M';
-  if (views >= 1000) return '\${(views / 1000).toStringAsFixed(1)}K';
+  if (views >= 1000000) return '${(views / 1000000).toStringAsFixed(1)}M';
+  if (views >= 1000) return '${(views / 1000).toStringAsFixed(1)}K';
   return views.toString();
 }
-
-
-import 'package:flutter/material.dart';
-import 'package:lucide_icons_flutter_plus/lucide_icons_flutter_plus.dart';
-import '../data/models.dart';
-import '../data/social.dart';
-import '../network/interaction_queue.dart';
-import '../theme/swifs_icon.dart';
-import '../widgets/post_media.dart';
-import '../widgets/user_avatar.dart';
-import '../../features/comments/comments_sheet.dart';
-
-const Color kPrimary = Color(0xFFFF6B35);
-const Color kInk = Color(0xFF111111);
-const Color kMuted = Color(0xFF8E8E93);
 
 class PostViewerScreen extends StatefulWidget {
   final FeedPost post;
@@ -329,7 +244,6 @@ class _PostViewerScreenState extends State<PostViewerScreen> {
       final media = await social.fetchPostMedia(widget.post.id);
       if (mounted) setState(() { _media = media; _loading = false; });
     } catch (_) {
-      // Fallback to the single post media if fetch fails
       if (mounted) {
         setState(() {
           if (widget.post.mediaUrl != null) {
@@ -350,7 +264,7 @@ class _PostViewerScreenState extends State<PostViewerScreen> {
     });
 
     InteractionQueue.instance.enqueue(
-      OutboxOp('like:\${widget.post.id}', 'like', {'postId': widget.post.id, 'liked': _liked}),
+      OutboxOp('like:${widget.post.id}', 'like', {'postId': widget.post.id, 'liked': _liked}),
       onSuccess: (result) {
         final r = result as LikeResult;
         if (mounted) setState(() { _liked = r.liked; _likes = r.count; });
@@ -366,7 +280,7 @@ class _PostViewerScreenState extends State<PostViewerScreen> {
     setState(() => _saved = !wasSaved);
 
     InteractionQueue.instance.enqueue(
-      OutboxOp('save:\${widget.post.id}', 'save', {'postId': widget.post.id, 'saved': _saved}),
+      OutboxOp('save:${widget.post.id}', 'save', {'postId': widget.post.id, 'saved': _saved}),
       onSuccess: (result) {
         if (mounted) setState(() => _saved = result as bool);
       },
@@ -385,25 +299,21 @@ class _PostViewerScreenState extends State<PostViewerScreen> {
         surfaceTintColor: Colors.white,
         elevation: 0,
         leading: IconButton(
-          icon: const SwifsIcon(LucideIcons.arrowLeft, color: kInk),
+          icon: const SwifsIcon(LucideIcons.arrowLeft, color: _kInk),
           onPressed: () => Navigator.pop(context),
         ),
-        title: GestureDetector(
-          onTap: () {}, // Navigate to profile if needed
-          child: Row(
-            children: [
-              UserAvatar(url: widget.post.avatarUrl, name: widget.post.user, radius: 16),
-              const SizedBox(width: 8),
-              Text('@\${widget.post.user}', style: const TextStyle(color: kInk, fontSize: 15, fontWeight: FontWeight.w600)),
-            ],
-          ),
+        title: Row(
+          children: [
+            UserAvatar(url: widget.post.avatarUrl, name: widget.post.user, radius: 16),
+            const SizedBox(width: 8),
+            Text('@${widget.post.user}', style: const TextStyle(color: _kInk, fontSize: 15, fontWeight: FontWeight.w600)),
+          ],
         ),
       ),
       body: _loading
-          ? const Center(child: CircularProgressIndicator(color: kPrimary))
+          ? const Center(child: CircularProgressIndicator(color: _kPrimary))
           : Column(
               children: [
-                // Carousel
                 Expanded(
                   child: Stack(
                     children: [
@@ -413,29 +323,21 @@ class _PostViewerScreenState extends State<PostViewerScreen> {
                         itemCount: _media.length,
                         itemBuilder: (_, i) {
                           final m = _media[i];
-                          return PostMedia(
-                            url: m['url'],
-                            thumbUrl: m['thumbUrl'],
-                            type: m['type'],
-                          );
+                          return PostMedia(url: m['url'], thumbUrl: m['thumbUrl'], type: m['type']);
                         },
                       ),
-                      // Dots indicator
                       if (_media.length > 1)
                         Positioned(
-                          bottom: 12,
-                          left: 0,
-                          right: 0,
+                          bottom: 12, left: 0, right: 0,
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: List.generate(_media.length, (i) {
                               return Container(
-                                width: 6,
-                                height: 6,
+                                width: 6, height: 6,
                                 margin: const EdgeInsets.symmetric(horizontal: 3),
                                 decoration: BoxDecoration(
                                   shape: BoxShape.circle,
-                                  color: _currentIndex == i ? kPrimary : Colors.grey.shade300,
+                                  color: _currentIndex == i ? _kPrimary : Colors.grey.shade300,
                                 ),
                               );
                             }),
@@ -444,7 +346,6 @@ class _PostViewerScreenState extends State<PostViewerScreen> {
                     ],
                   ),
                 ),
-                // Action Bar & Caption
                 Padding(
                   padding: const EdgeInsets.all(12),
                   child: Column(
@@ -454,39 +355,29 @@ class _PostViewerScreenState extends State<PostViewerScreen> {
                         children: [
                           GestureDetector(
                             onTap: _toggleLike,
-                            child: SwifsIcon(
-                              _liked ? LucideIcons.heart : LucideIcons.heart,
-                              size: 28,
-                              color: _liked ? Colors.red : kInk,
-                            ),
+                            child: SwifsIcon(_liked ? LucideIcons.heart : LucideIcons.heart, size: 28, color: _liked ? Colors.red : _kInk),
                           ),
                           const SizedBox(width: 16),
                           GestureDetector(
                             onTap: () => showCommentsSheet(context, postId: widget.post.id),
-                            child: const SwifsIcon(LucideIcons.messageCircle, size: 28, color: kInk),
+                            child: const SwifsIcon(LucideIcons.messageCircle, size: 28, color: _kInk),
                           ),
                           const SizedBox(width: 16),
-                          const SwifsIcon(LucideIcons.send, size: 28, color: kInk),
+                          const SwifsIcon(LucideIcons.send, size: 28, color: _kInk),
                           const Spacer(),
                           GestureDetector(
                             onTap: _toggleSave,
-                            child: SwifsIcon(
-                              LucideIcons.bookmark,
-                              size: 28,
-                              color: _saved ? kPrimary : kInk,
-                            ),
+                            child: SwifsIcon(LucideIcons.bookmark, size: 28, color: _saved ? _kPrimary : _kInk),
                           ),
                         ],
                       ),
                       const SizedBox(height: 8),
-                      Text('\$_likes likes', style: const TextStyle(fontWeight: FontWeight.w600, color: kInk)),
+                      Text('$_likes likes', style: const TextStyle(fontWeight: FontWeight.w600, color: _kInk)),
                       const SizedBox(height: 4),
-                      Text.rich(
-                        TextSpan(children: [
-                          TextSpan(text: '@\${widget.post.user} ', style: const TextStyle(fontWeight: FontWeight.w600, color: kInk)),
-                          TextSpan(text: widget.post.caption, style: const TextStyle(color: kInk)),
-                        ]),
-                      ),
+                      Text.rich(TextSpan(children: [
+                        TextSpan(text: '@${widget.post.user} ', style: const TextStyle(fontWeight: FontWeight.w600, color: _kInk)),
+                        TextSpan(text: widget.post.caption, style: const TextStyle(color: _kInk)),
+                      ])),
                       const SizedBox(height: 16),
                     ],
                   ),
