@@ -33,7 +33,6 @@ BACKEND_FILES = [
 
 CI_FILES = [
     '.github/workflows/build.yml',
-    '.github/workflows/backend-ci.yml',
 ]
 
 def check(label, files):

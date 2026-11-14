@@ -6,12 +6,28 @@ on:
   workflow_dispatch:
 
 jobs:
-  build:
+  build-android:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
 
+      # 1. PHP Backend Lint
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          tools: composer
+
+      - name: Install PHP dependencies
+        working-directory: backend
+        run: composer install --no-interaction --prefer-dist
+
+      - name: Lint PHP
+        working-directory: backend
+        run: find src public routes config -name "*.php" -exec php -l {} \;
+
+      # 2. Flutter Android Build
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -45,30 +61,10 @@ jobs:
           cp app/native/include/swifs_core.h app/android/app/src/main/cpp/ 2>/dev/null || true
           cp app/native/CMakeLists.txt app/android/app/src/main/cpp/CMakeLists.txt 2>/dev/null || true
 
+      # 3. Run Python Optimizer
       - name: Apply Size Optimizations
         working-directory: app
-        run: python3 -c "
-import re, pathlib
-p = pathlib.Path('android/app/build.gradle')
-s = p.read_text()
-block = '''    packagingOptions {
-        jniLibs { useLegacyPackaging = true }
-        resources { excludes += setOf(
-            'META-INF/*.kotlin_module', 'META-INF/*.version',
-            'META-INF/AL2.0', 'META-INF/LGPL2.1',
-            'META-INF/LICENSE*', 'META-INF/NOTICE*',
-            'META-INF/DEPENDENCIES', 'META-INF/proguard/*',
-            'META-INF/gradle/incremental.annotation.processors'
-        ) }
-    }
-'''
-if 'packagingOptions' not in s:
-    s = s.replace('android {', 'android {\n' + block, 1)
-    p.write_text(s)
-    print('packagingOptions injected')
-else:
-    print('packagingOptions already present')
-"
+        run: python3 ../scripts/optimize_build.py
 
       - name: Flutter pub get
         working-directory: app
