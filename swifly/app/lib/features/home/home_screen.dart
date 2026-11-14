@@ -12,6 +12,10 @@ import '../../core/data/models.dart';
 import '../../core/data/social.dart';
 import '../../core/widgets/post_media.dart';
 import '../../core/widgets/user_avatar.dart';
+import '../../core/widgets/story_ring.dart';
+import '../../core/data/stories_repository.dart';
+import '../stories/story_camera_screen.dart';
+import '../stories/story_viewer_screen.dart';
 import '../../core/network/interaction_queue.dart';
 import '../comments/comments_sheet.dart';
 import '../create/create_post_screen.dart';
@@ -30,6 +34,28 @@ class _HomeScreenState extends State<HomeScreen> {
   final AudioPlayer _audioPlayer = AudioPlayer();
   final RefreshController _refreshController = RefreshController(initialRefresh: false);
   bool _loading = true;
+  List<StoryGroup> _groups = [];
+  String? _myAvatar;
+  String _myName = 'You';
+
+  StoryGroup? get _mine {
+    for (final g in _groups) {
+      if (g.isMine) return g;
+    }
+    return null;
+  }
+
+  void _onStoryUploadChanged() {
+    if (StoriesRepository.uploadProgress.value == null) _loadStories();
+  }
+
+  void _onStoryError() {
+    final e = StoriesRepository.uploadError.value;
+    if (e != null && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e)));
+      StoriesRepository.uploadError.value = null;
+    }
+  }
 
   @override
   void initState() {
@@ -38,10 +64,15 @@ class _HomeScreenState extends State<HomeScreen> {
 
     // Preload audio for low latency
     _loadFeed();
+    _loadStories();
+    StoriesRepository.uploadProgress.addListener(_onStoryUploadChanged);
+    StoriesRepository.uploadError.addListener(_onStoryError);
   }
 
   @override
   void dispose() {
+    StoriesRepository.uploadProgress.removeListener(_onStoryUploadChanged);
+    StoriesRepository.uploadError.removeListener(_onStoryError);
     _audioPlayer.dispose();
     _refreshController.dispose();
     super.dispose();
@@ -205,6 +236,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 controller: _refreshController,
                 onRefresh: () async {
+                  await _loadStories();
                   await _loadFeed();
                   _refreshController.refreshCompleted();
                 },
@@ -248,29 +280,135 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       );
 
+  /// Loads the story rail and my profile photo for the first ring.
+  Future<void> _loadStories() async {
+    try {
+      final groups = await StoriesRepository.instance.fetchRail();
+      Map<String, dynamic>? me;
+      try {
+        me = await social.fetchMyProfile();
+      } catch (_) {
+        me = await social.cachedMyProfile();
+      }
+      if (!mounted) return;
+      setState(() {
+        _groups = groups;
+        _myAvatar = me?['avatar_url']?.toString();
+        final name = (me?['display_name'] ?? '').toString().trim();
+        final handle = (me?['username'] ?? '').toString().trim();
+        _myName = name.isNotEmpty ? name : (handle.isNotEmpty ? handle : 'You');
+      });
+    } catch (_) {
+      // Offline: keep the rail that is already on screen.
+    }
+  }
+
+  void _openCamera() {
+    Navigator.push(context, MaterialPageRoute(builder: (_) => const StoryCameraScreen()))
+        .then((_) => _loadStories());
+  }
+
+  void _openViewer(int groupIndex) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => StoryViewerScreen(groups: _groups, startGroup: groupIndex)),
+    ).then((_) => _loadStories());
+  }
+
+  Widget _storyColumn({required Widget avatar, required String label, required VoidCallback onTap}) {
+    return GestureDetector(
+      onTap: onTap,
+      child: SizedBox(
+        width: 74,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            avatar,
+            const SizedBox(height: 4),
+            Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w500),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _myStoryItem(double? uploading) {
+    final mine = _mine;
+    final hasStory = mine != null;
+    final avatar = SizedBox(
+      width: 68,
+      height: 68,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          StoryRing(
+            size: 68,
+            seen: mine == null || mine.allSeen,
+            uploadProgress: uploading,
+            child: UserAvatar(url: _myAvatar, name: _myName, radius: 30),
+          ),
+          if (uploading == null)
+            Positioned(
+              right: -2,
+              bottom: -2,
+              child: GestureDetector(
+                onTap: _openCamera,
+                child: Container(
+                  width: 22,
+                  height: 22,
+                  decoration: BoxDecoration(
+                    color: kStoryBlue,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.white, width: 2),
+                  ),
+                  child: const Icon(Icons.add, color: Colors.white, size: 14),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+    final label = uploading != null ? 'Sharing…' : 'Your story';
+    final onTap = (mine != null && uploading == null)
+        ? () => _openViewer(_groups.indexOf(mine))
+        : _openCamera;
+    return _storyColumn(avatar: avatar, label: label, onTap: onTap);
+  }
+
   Widget _storiesRow() {
-    final stories = ['Your Story', 'alex', 'mia', 'leo', 'zara'];
     return SizedBox(
       height: 100,
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.only(left: 12),
-        itemCount: stories.length,
-        itemBuilder: (_, i) => Padding(
-          padding: const EdgeInsets.only(right: 16),
-          child: Column(children: [
-            Container(
-              width: 68, height: 68,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(color: i == 0 ? Colors.grey.shade300 : kPrimary, width: 2.5),
-              ),
-              child: const CircleAvatar(backgroundColor: Colors.grey),
-            ),
-            const SizedBox(height: 4),
-            Text(stories[i], style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w500)),
-          ]),
-        ),
+      child: ValueListenableBuilder<double?>(
+        valueListenable: StoriesRepository.uploadProgress,
+        builder: (context, uploading, _) {
+          final others = _groups.where((g) => !g.isMine).toList();
+          return ListView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.only(left: 12, top: 4),
+            children: [
+              Padding(padding: const EdgeInsets.only(right: 12), child: _myStoryItem(uploading)),
+              for (final g in others)
+                Padding(
+                  padding: const EdgeInsets.only(right: 12),
+                  child: _storyColumn(
+                    avatar: StoryRing(
+                      size: 68,
+                      seen: g.allSeen,
+                      child: UserAvatar(url: g.avatarUrl, name: g.label, radius: 30),
+                    ),
+                    label: g.label,
+                    onTap: () => _openViewer(_groups.indexOf(g)),
+                  ),
+                ),
+            ],
+          );
+        },
       ),
     );
   }
