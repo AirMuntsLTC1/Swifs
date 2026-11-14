@@ -29,7 +29,10 @@ class _ExploreScreenState extends State<ExploreScreen> {
       child: SmartRefresher(
         enablePullDown: true,
         header: CustomHeader(
-          builder: (context, mode) => buildSwifsRefreshIcon(LucideIcons.search),
+          height: 60.0,
+          builder: (context, mode) => Center(
+            child: buildSwifsRefreshIcon(LucideIcons.search),
+          ),
         ),
         controller: _refreshController,
         onRefresh: () async {

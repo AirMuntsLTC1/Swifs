@@ -27,7 +27,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
       child: SmartRefresher(
         enablePullDown: true,
         header: CustomHeader(
-          builder: (context, mode) => buildSwifsRefreshIcon(LucideIcons.user),
+          height: 60.0,
+          builder: (context, mode) => Center(
+            child: buildSwifsRefreshIcon(LucideIcons.user),
+          ),
         ),
         controller: _refreshController,
         onRefresh: () async {

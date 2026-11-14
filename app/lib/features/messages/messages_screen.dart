@@ -34,7 +34,10 @@ class _MessagesScreenState extends State<MessagesScreen> {
       child: SmartRefresher(
         enablePullDown: true,
         header: CustomHeader(
-          builder: (context, mode) => buildSwifsRefreshIcon(LucideIcons.messageSquare),
+          height: 60.0,
+          builder: (context, mode) => Center(
+            child: buildSwifsRefreshIcon(LucideIcons.messageSquare),
+          ),
         ),
         controller: _refreshController,
         onRefresh: () async {

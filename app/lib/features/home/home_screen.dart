@@ -46,7 +46,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _playPopSound() async {
     try {
-      await _audioPlayer.play(AssetSource('sounds/bubble_pop.mp3'));
+      final player = AudioPlayer();
+      player.play(AssetSource('sounds/bubble_pop.mp3'));
+      player.onPlayerComplete.listen((_) => player.dispose());
     } catch (e) {
       print('Audio error: $e');
     }
@@ -120,7 +122,10 @@ class _HomeScreenState extends State<HomeScreen> {
               child: SmartRefresher(
                 enablePullDown: true,
                 header: CustomHeader(
-                  builder: (context, mode) => buildSwifsRefreshIcon(LucideIcons.house),
+                  height: 60.0, // Constrains the pull area
+                  builder: (context, mode) => Center(
+                    child: buildSwifsRefreshIcon(LucideIcons.house),
+                  ),
                 ),
                 controller: _refreshController,
                 onRefresh: () async {

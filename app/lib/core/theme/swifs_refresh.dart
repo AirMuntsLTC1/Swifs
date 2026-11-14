@@ -5,16 +5,18 @@ const Color kPrimary = Color(0xFFFF6B35);
 
 Widget buildSwifsRefreshIcon(IconData icon) {
   return Container(
-    width: 44,
-    height: 44,
+    width: 42,
+    height: 42,
     decoration: BoxDecoration(
       color: Colors.white,
-      borderRadius: BorderRadius.circular(22),
-      boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 4)],
-      border: Border.all(color: Colors.grey.shade300),
+      shape: BoxShape.circle,
+      boxShadow: const [
+        BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 2))
+      ],
+      border: Border.all(color: const Color(0xFFF0F2F5), width: 1.5),
     ),
     child: Center(
-      child: SwifsIcon(icon, color: kPrimary, size: 22),
+      child: SwifsIcon(icon, color: kPrimary, size: 20),
     ),
   );
 }
