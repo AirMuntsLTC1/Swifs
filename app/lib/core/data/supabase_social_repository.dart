@@ -404,11 +404,38 @@ class SupabaseSocialRepository implements SocialRepository {
   // Comments
   // ------------------------------------------------------------------
 
+  /// Saved comments, plus comments sent while offline that are still waiting in the outbox,
+  /// so they stay visible when the sheet is closed and opened again.
   @override
   Future<List<CommentModel>?> cachedComments(String postId) async {
     final raw = await _cache.read('cache.comments.$postId');
-    if (raw is! List) return null;
-    final flat = raw.map((e) => CommentModel.fromFlat(Map<String, dynamic>.from(e as Map))).toList();
+    final flat = raw is List
+        ? raw.map((e) => CommentModel.fromFlat(Map<String, dynamic>.from(e as Map))).toList()
+        : <CommentModel>[];
+
+    final outbox = await _cache.read('outbox');
+    if (outbox is List) {
+      final me = _db.auth.currentUser?.id ?? '';
+      final prof = await cachedMyProfile();
+      for (final e in outbox) {
+        if (e is! Map || e['kind'] != 'comment') continue;
+        final args = Map<String, dynamic>.from(e['args'] as Map);
+        if (args['postId']?.toString() != postId) continue;
+        final tempId = args['tempId']?.toString();
+        if (tempId == null || flat.any((c) => c.id == tempId)) continue;
+        final avatar = prof?['avatar_url']?.toString();
+        flat.add(CommentModel(
+          id: tempId,
+          parentId: args['parentId']?.toString(),
+          authorId: me,
+          user: (prof?['username'] ?? 'You').toString(),
+          avatarUrl: (avatar != null && avatar.isNotEmpty) ? avatar : null,
+          text: (args['text'] ?? '').toString(),
+          time: 'now',
+        ));
+      }
+    }
+    if (raw is! List && flat.isEmpty) return null;
     return buildCommentTree(flat);
   }
 

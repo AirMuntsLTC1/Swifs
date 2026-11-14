@@ -5,6 +5,7 @@ import '../../core/data/social.dart';
 import '../../core/network/interaction_queue.dart';
 import '../../core/widgets/pop_heart.dart';
 import '../../core/widgets/user_avatar.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 const Color kPrimary = Color(0xFFFF6B35);
 const Color kInk = Color(0xFF111111);
@@ -38,11 +39,35 @@ class _CommentsSheetState extends State<CommentsSheet> {
   int _tempSeq = 0;
   CommentModel? _replyTo;
   String? _replyMention;
+  // Your own name and photo: used for your comments and the composer avatar.
+  String? _myId;
+  String? _myHandle;
+  String? _myAvatar;
 
   @override
   void initState() {
     super.initState();
     _load();
+    _loadMe();
+  }
+
+  /// Your name and photo: the cached copy first, then a fresh one from the server.
+  Future<void> _loadMe() async {
+    _myId = Supabase.instance.client.auth.currentUser?.id;
+    final cached = await social.cachedMyProfile();
+    if (cached != null && mounted) setState(() => _setMe(cached));
+    try {
+      final fresh = await social.fetchMyProfile();
+      if (mounted) setState(() => _setMe(fresh));
+    } catch (_) {
+      // Offline: the cached copy stays.
+    }
+  }
+
+  void _setMe(Map<String, dynamic> p) {
+    _myHandle = p['username']?.toString();
+    final avatar = p['avatar_url']?.toString();
+    _myAvatar = (avatar != null && avatar.isNotEmpty) ? avatar : null;
   }
 
   @override
@@ -97,7 +122,15 @@ class _CommentsSheetState extends State<CommentsSheet> {
     if (text.isEmpty) return;
     final parent = _replyTo;
     final tempId = 'tmp${++_tempSeq}';
-    final temp = CommentModel(id: tempId, parentId: parent?.id, user: kCurrentUser, text: text, time: 'now');
+    final temp = CommentModel(
+      id: tempId,
+      parentId: parent?.id,
+      authorId: _myId ?? '',
+      user: _myHandle ?? 'You',
+      avatarUrl: _myAvatar,
+      text: text,
+      time: 'now',
+    );
 
     setState(() {
       if (parent != null) {
@@ -429,14 +462,7 @@ class _CommentsSheetState extends State<CommentsSheet> {
           const SizedBox(height: 8),
           Row(
             children: [
-              const CircleAvatar(
-                radius: 14,
-                backgroundColor: kPrimary,
-                child: Text(
-                  'Y',
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.white),
-                ),
-              ),
+              UserAvatar(url: _myAvatar, name: _myHandle ?? 'You', radius: 14),
               const SizedBox(width: 10),
               Expanded(
                 child: TextField(
@@ -469,5 +495,3 @@ class _CommentsSheetState extends State<CommentsSheet> {
     );
   }
 }
-
-

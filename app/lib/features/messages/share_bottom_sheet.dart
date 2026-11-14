@@ -71,8 +71,12 @@ class _ShareBottomSheetState extends State<ShareBottomSheet> {
              (u['display_name'] ?? '').toString().toLowerCase().contains(q);
     }).toList();
 
-    return Container(
-      height: MediaQuery.of(context).size.height * 0.85,
+    final keyboard = MediaQuery.of(context).viewInsets.bottom;
+    final screenH = MediaQuery.of(context).size.height;
+    return Padding(
+      padding: EdgeInsets.only(bottom: keyboard),
+      child: Container(
+      height: (screenH - keyboard) * 0.85,
       decoration: const BoxDecoration(color: Colors.white, borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       child: Column(
         children: [
@@ -212,6 +216,7 @@ class _ShareBottomSheetState extends State<ShareBottomSheet> {
           ),
         ],
       ),
+    ),
     );
   }
 }
