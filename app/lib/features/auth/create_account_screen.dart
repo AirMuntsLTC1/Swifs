@@ -224,7 +224,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
               onResend: () => AuthService.sendSignupCode(
                 email: _emailValue,
                 username: _username,
-                displayName: _displayName.text.trim(),
+                displayName: '${_firstName.text.trim()} ${_lastName.text.trim()}',
                 firstName: _firstName.text.trim(),
                 lastName: _lastName.text.trim(),
               ),
