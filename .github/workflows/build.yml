@@ -27,7 +27,7 @@ jobs:
         working-directory: backend
         run: find src public routes config -name "*.php" -exec php -l {} \;
 
-      # 2. Flutter Android Build
+      # 2. Flutter Android Build Setup
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -48,10 +48,23 @@ jobs:
           key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
           restore-keys: gradle-${{ runner.os }}-
 
+      # 3. Preserve custom code before flutter create overwrites it
+      - name: Preserve Custom Code
+        run: |
+          mv app/lib /tmp/swifs_lib
+          mv app/pubspec.yaml /tmp/swifs_pubspec.yaml
+
       - name: Scaffold Android Project
         working-directory: app
         run: flutter create . --project-name swifs --platforms=android --org com.swifs
 
+      - name: Restore Custom Code
+        run: |
+          rm -rf app/lib
+          mv /tmp/swifs_lib app/lib
+          cp /tmp/swifs_pubspec.yaml app/pubspec.yaml
+
+      # 4. Inject Native Code
       - name: Inject Native Code
         run: |
           mkdir -p app/android/app/src/main/kotlin/com/swifs/native
@@ -61,7 +74,7 @@ jobs:
           cp app/native/include/swifs_core.h app/android/app/src/main/cpp/ 2>/dev/null || true
           cp app/native/CMakeLists.txt app/android/app/src/main/cpp/CMakeLists.txt 2>/dev/null || true
 
-      # 3. Run Python Optimizer
+      # 5. Run Python Optimizer
       - name: Apply Size Optimizations
         working-directory: app
         run: python3 ../scripts/optimize_build.py
