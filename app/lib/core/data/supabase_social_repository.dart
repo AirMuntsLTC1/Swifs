@@ -859,8 +859,9 @@ class SupabaseSocialRepository implements SocialRepository {
     await bucket.upload(storagePath, file, fileOptions: FileOptions(contentType: _mime(ext), upsert: true));
     uploaded.add(storagePath);
 
-    var width = 0;
-    var height = 0;
+    // Real size from the picker. Used for the feed card's aspect ratio.
+    var width = (item['width'] as num?)?.toInt() ?? 0;
+    var height = (item['height'] as num?)?.toInt() ?? 0;
     Uint8List? thumbBytes;
     try {
       if (isVideo) {
@@ -871,9 +872,11 @@ class SupabaseSocialRepository implements SocialRepository {
           quality: 75,
         );
       } else {
-        final size = await _imageSize(file);
-        width = size.$1;
-        height = size.$2;
+        if (width <= 0 || height <= 0) {
+          final size = await _imageSize(file);
+          width = size.$1;
+          height = size.$2;
+        }
         thumbBytes = await _imageThumb(file);
       }
     } catch (_) {

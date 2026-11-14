@@ -425,7 +425,10 @@ class _PostViewerScreenState extends State<PostViewerScreen> {
         children: [
           _loadingMedia && _media.isEmpty
               ? AspectRatio(aspectRatio: ratio, child: const SwifsSkeletonBox())
-              : PostCarousel(media: _media, ratio: ratio),
+              : SizedBox(
+                  width: double.infinity,
+                  child: PostCarousel(media: _media, ratio: ratio),
+                ),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
             child: Row(

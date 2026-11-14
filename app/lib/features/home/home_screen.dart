@@ -568,7 +568,13 @@ class _HomeScreenState extends State<HomeScreen> {
                   ],
                 ),
               ),
-              PostCarousel(media: _mediaOf(p), ratio: postAspectRatio(_mediaOf(p).isEmpty ? null : _mediaOf(p).first)),
+              SizedBox(
+                width: double.infinity,
+                child: PostCarousel(
+                  media: _mediaOf(p),
+                  ratio: postAspectRatio(_mediaOf(p).isEmpty ? null : _mediaOf(p).first),
+                ),
+              ),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
                 child: Row(

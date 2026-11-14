@@ -84,6 +84,8 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
           mediaList.add({
             'path': file.path,
             'type': asset.type == AssetType.video ? 'video' : 'image',
+            'width': asset.width,
+            'height': asset.height,
           });
         }
       }
