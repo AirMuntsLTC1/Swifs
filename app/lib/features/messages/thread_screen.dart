@@ -54,6 +54,9 @@ class _ThreadScreenState extends State<ThreadScreen> {
   final _repo = MessagesRepository.instance;
   final _input = TextEditingController();
   List<DirectMessage> _messages = [];
+  // Ids already shown. Ids added after the first load animate in once.
+  final Set<String> _knownIds = {};
+  final Set<String> _animateIds = {};
   final Map<String, Future<String?>> _storyFutures = {};
   DirectMessage? _replyTo;
   bool _loading = true;
@@ -93,11 +96,18 @@ class _ThreadScreenState extends State<ThreadScreen> {
     try {
       final list = await _repo.fetchThread(widget.otherId);
       if (!mounted) return;
+      // The server sends newest first. The thread keeps oldest first, so the newest sits at the bottom.
+      final ordered = list.reversed.toList();
       setState(() {
-        // Keep any message still sending, so it does not vanish on a live update.
-        // Keep messages still sending or failed, so a failed one stays visible with a retry.
+        // Keep messages still sending or failed, so they stay visible until they are sent or retried.
         final pending = _messages.where((m) => m.pending || m.failed).toList();
-        _messages = [...list, ...pending];
+        if (_knownIds.isNotEmpty) {
+          for (final m in ordered) {
+            if (!_knownIds.contains(m.id)) _animateIds.add(m.id);
+          }
+        }
+        _knownIds.addAll(ordered.map((m) => m.id));
+        _messages = [...ordered, ...pending];
         _loading = false;
       });
       unawaited(_repo.markRead(widget.otherId).catchError((_) {}));
@@ -126,12 +136,14 @@ class _ThreadScreenState extends State<ThreadScreen> {
     _input.clear();
     setState(() {
       _messages = [..._messages, temp];
+      _animateIds.add(tempId);
       _replyTo = null;
     });
 
     try {
       final saved = await _repo.send(widget.otherId, text, replyToId: replyId);
       if (!mounted) return;
+      _knownIds.add(saved.id);
       setState(() {
         _messages = [
           for (final m in _messages)
@@ -428,7 +440,12 @@ class _ThreadScreenState extends State<ThreadScreen> {
                           return Column(
                             crossAxisAlignment: mine ? CrossAxisAlignment.end : CrossAxisAlignment.start,
                             children: [
-                              _bubble(m, mine),
+                              _AppearAnimation(
+                                key: ValueKey(m.id),
+                                animate: _animateIds.contains(m.id),
+                                mine: mine,
+                                child: _bubble(m, mine),
+                              ),
                               if (m.reactions.isNotEmpty) _reactionChips(m, mine),
                               if (m.id == showSeenFor)
                                 const Padding(
@@ -829,6 +846,61 @@ class SharedPostWidget extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+}
+
+
+/// Plays once when a bubble first appears: it rises, fades in and grows slightly from its side.
+/// Bubbles already on screen are shown at once, without replaying the animation.
+class _AppearAnimation extends StatefulWidget {
+  final bool animate;
+  final bool mine;
+  final Widget child;
+
+  const _AppearAnimation({super.key, required this.animate, required this.mine, required this.child});
+
+  @override
+  State<_AppearAnimation> createState() => _AppearAnimationState();
+}
+
+class _AppearAnimationState extends State<_AppearAnimation> with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 380),
+    value: widget.animate ? 0 : 1,
+  );
+  late final Animation<double> _curve = CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic);
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.animate) _controller.forward();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FadeTransition(
+      opacity: _curve,
+      child: SlideTransition(
+        position: Tween<Offset>(
+          begin: Offset(widget.mine ? 0.12 : -0.12, 0.35),
+          end: Offset.zero,
+        ).animate(_curve),
+        child: ScaleTransition(
+          scale: Tween<double>(begin: 0.8, end: 1.0).animate(
+            CurvedAnimation(parent: _controller, curve: Curves.easeOutBack),
+          ),
+          alignment: widget.mine ? Alignment.centerRight : Alignment.centerLeft,
+          child: widget.child,
+        ),
+      ),
     );
   }
 }

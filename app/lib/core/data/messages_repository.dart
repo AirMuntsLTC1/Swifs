@@ -81,7 +81,7 @@ class MessagesRepository {
   MessagesRepository._();
   static final MessagesRepository instance = MessagesRepository._();
 
-  static const _select = 'id, sender, recipient, text, created_at, read_at, reply_to_id, story_id, pinned_at';
+  static const _select = 'id, sender, recipient, text, created_at, read_at, reply_to_id, story_id, pinned_at, shared_post_id, group_id';
 
   SupabaseClient get _db => Supabase.instance.client;
 
