@@ -641,7 +641,7 @@ class SupabaseSocialRepository implements SocialRepository {
         final me = _me;
         final rows = await _db
             .from('notifications')
-            .select('id, type, actor_handle, actor_name, avatar_url, created_at')
+            .select('id, type, actor_handle, actor_name, avatar_url, post_id, comment_id, created_at')
             .eq('user_id', me)
             .order('created_at', ascending: false)
             .limit(100);
@@ -655,8 +655,12 @@ class SupabaseSocialRepository implements SocialRepository {
         for (final r in list) {
           final type = r['type'].toString();
           final handle = _cleanHandle(r['actor_handle']).toLowerCase();
-          final isFollowKind = type.startsWith('follow');
-          if (!isFollowKind || seen.add('$type|$handle')) unique.add(r);
+          // A follow, unfollow or re-follow adds a row each time: show one per person.
+          // Other kinds show once per person, per kind, per post or comment.
+          final key = type.toLowerCase().contains('follow')
+              ? 'follow|$handle'
+              : '$type|$handle|${r['post_id'] ?? ''}|${r['comment_id'] ?? ''}';
+          if (seen.add(key)) unique.add(r);
         }
 
         final handles = unique.map((r) => _cleanHandle(r['actor_handle'])).where((h) => h.isNotEmpty).toSet().toList();
@@ -811,79 +815,96 @@ class SupabaseSocialRepository implements SocialRepository {
           throw DataException('You can add up to $kMaxPostMedia photos or videos per post.');
         }
         final postId = const Uuid().v4();
-        final bucket = _db.storage.from('post-media');
         final uploaded = <String>[];
 
         try {
+          // Files go up at the same time. The post and its media rows are written last, so an empty
+          // post never shows in the feed while files are still uploading.
+          final rows = await Future.wait([
+            for (int i = 0; i < media.length; i++) _uploadMedia(me, postId, i, media[i], uploaded),
+          ]);
           await _db.from('posts').insert({
             'id': postId,
             'author_id': me,
             'text': caption,
             'created_at': DateTime.now().toUtc().toIso8601String(),
           });
-
-          for (int i = 0; i < media.length; i++) {
-            final item = media[i];
-            final path = item['path'] as String;
-            final isVideo = (item['type'] as String) == 'video';
-            final file = File(path);
-            final ext = _extOf(path, isVideo ? 'mp4' : 'jpg');
-            final storagePath = '$me/$postId/$i.$ext';
-
-            await bucket.upload(storagePath, file, fileOptions: FileOptions(contentType: _mime(ext), upsert: true));
-            uploaded.add(storagePath);
-
-            var width = 0;
-            var height = 0;
-            Uint8List? thumbBytes;
-            final thumbName = isVideo ? '$me/$postId/$i-thumb.jpg' : '$me/$postId/$i-thumb.png';
-            if (isVideo) {
-              thumbBytes = await VideoThumbnail.thumbnailData(
-                video: path,
-                imageFormat: ImageFormat.JPEG,
-                maxWidth: 480,
-                quality: 75,
-              );
-            } else {
-              final size = await _imageSize(file);
-              width = size.$1;
-              height = size.$2;
-              thumbBytes = await _imageThumb(file);
-            }
-
-            String? thumbPath;
-            if (thumbBytes != null) {
-              // Thumbnails are PNG for images and JPEG for videos. The content type must match the bytes.
-              await bucket.uploadBinary(
-                thumbName,
-                thumbBytes,
-                fileOptions: FileOptions(contentType: isVideo ? 'image/jpeg' : 'image/png', upsert: true),
-              );
-              uploaded.add(thumbName);
-              thumbPath = thumbName;
-            }
-
-            await _db.from('post_media').insert({
-              'post_id': postId,
-              'position': i,
-              'kind': isVideo ? 'video' : 'image',
-              'storage_path': storagePath,
-              'thumb_path': thumbPath,
-              'width': width,
-              'height': height,
-            });
-          }
+          await _db.from('post_media').insert(rows);
         } catch (_) {
-          // Roll back, so no half-made post is left in the feed.
-          try {
-            await _db.from('posts').delete().eq('id', postId);
-          } catch (_) {}
+          // Remove the files of a post that did not save.
           if (uploaded.isNotEmpty) {
             try {
-              await bucket.remove(uploaded);
+              await _db.storage.from('post-media').remove(uploaded);
             } catch (_) {}
           }
           rethrow;
         }
       });
+
+  /// Uploads one photo or video and its thumbnail. Returns the post_media row.
+  Future<Map<String, dynamic>> _uploadMedia(
+    String me,
+    String postId,
+    int i,
+    Map<String, dynamic> item,
+    List<String> uploaded,
+  ) async {
+    final bucket = _db.storage.from('post-media');
+    final path = item['path'] as String;
+    final isVideo = (item['type'] as String) == 'video';
+    final file = File(path);
+    final ext = _extOf(path, isVideo ? 'mp4' : 'jpg');
+    final storagePath = '$me/$postId/$i.$ext';
+
+    await bucket.upload(storagePath, file, fileOptions: FileOptions(contentType: _mime(ext), upsert: true));
+    uploaded.add(storagePath);
+
+    var width = 0;
+    var height = 0;
+    Uint8List? thumbBytes;
+    try {
+      if (isVideo) {
+        thumbBytes = await VideoThumbnail.thumbnailData(
+          video: path,
+          imageFormat: ImageFormat.JPEG,
+          maxWidth: 480,
+          quality: 75,
+        );
+      } else {
+        final size = await _imageSize(file);
+        width = size.$1;
+        height = size.$2;
+        thumbBytes = await _imageThumb(file);
+      }
+    } catch (_) {
+      // A thumbnail that cannot be made must not stop the post. The feed shows a poster instead.
+      thumbBytes = null;
+    }
+
+    String? thumbPath;
+    if (thumbBytes != null) {
+      final thumbName = isVideo ? '$me/$postId/$i-thumb.jpg' : '$me/$postId/$i-thumb.png';
+      try {
+        await bucket.uploadBinary(
+          thumbName,
+          thumbBytes,
+          fileOptions: FileOptions(contentType: isVideo ? 'image/jpeg' : 'image/png', upsert: true),
+        );
+        uploaded.add(thumbName);
+        thumbPath = thumbName;
+      } catch (_) {
+        thumbPath = null;
+      }
+    }
+
+    return {
+      'post_id': postId,
+      'position': i,
+      'kind': isVideo ? 'video' : 'image',
+      'storage_path': storagePath,
+      'thumb_path': thumbPath,
+      'width': width,
+      'height': height,
+    };
+  }
 }

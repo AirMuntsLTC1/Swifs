@@ -5,6 +5,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:lucide_icons_flutter_plus/lucide_icons_flutter_plus.dart';
 import 'package:photo_manager/photo_manager.dart';
 import '../../core/data/stories_repository.dart';
+import '../../core/widgets/asset_preview.dart';
 import '../../core/theme/swifs_icon.dart';
 import 'story_review_screen.dart';
 
@@ -186,19 +187,9 @@ class _StoryCameraScreenState extends State<StoryCameraScreen> {
           child: Container(
             width: double.infinity,
             color: const Color(0xFFF0F2F5),
-            child: _previewIsVideo
-                ? (_previewThumb == null
-                    ? const SizedBox.shrink()
-                    : Stack(
-                        fit: StackFit.expand,
-                        children: [
-                          Image.memory(_previewThumb!, fit: BoxFit.cover),
-                          const Center(child: Icon(Icons.play_circle_fill, color: Colors.white, size: 64)),
-                        ],
-                      ))
-                : _preview == null
-                    ? const SizedBox.shrink()
-                    : Image.file(_preview!, fit: BoxFit.cover),
+            child: _selected == null
+                ? const SizedBox.shrink()
+                : AssetPreview(key: ValueKey(_selected!.id), asset: _selected!, fit: BoxFit.cover),
           ),
         ),
         Padding(

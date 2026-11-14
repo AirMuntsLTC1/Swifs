@@ -33,6 +33,7 @@ class RealtimeHub {
   RealtimeChannel? _channelRef;
   String? _userId;
   bool _permissionAsked = false;
+  Timer? _restartTimer;
 
   bool get isRunning => _channelRef != null;
 
@@ -83,12 +84,28 @@ class RealtimeHub {
       },
     );
 
-    channel.subscribe();
+    channel.subscribe(_onStatus);
     _channelRef = channel;
+  }
+
+  /// Logs the connection state and reconnects if the channel fails or times out.
+  void _onStatus(RealtimeSubscribeStatus status, Object? error) {
+    debugPrint('Realtime status: $status${error == null ? '' : ' ($error)'}');
+    if (status == RealtimeSubscribeStatus.channelError ||
+        status == RealtimeSubscribeStatus.timedOut ||
+        status == RealtimeSubscribeStatus.closed) {
+      _restartTimer?.cancel();
+      _restartTimer = Timer(const Duration(seconds: 3), () {
+        _channelRef = null;
+        _userId = null;
+        start();
+      });
+    }
   }
 
   /// Disconnects (on sign-out).
   void stop() {
+    _restartTimer?.cancel();
     final ch = _channelRef;
     _channelRef = null;
     _userId = null;

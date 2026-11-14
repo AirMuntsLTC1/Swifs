@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter_plus/lucide_icons_flutter_plus.dart';
 import 'package:photo_manager/photo_manager.dart';
+import '../../core/widgets/asset_preview.dart';
 import '../../core/theme/swifs_icon.dart';
 import '../../core/data/social.dart';
 
@@ -131,13 +132,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                     color: const Color(0xFFF0F2F5),
                     child: _previewAsset == null
                         ? const Center(child: Text('Select media', style: TextStyle(color: kMuted)))
-                        : FutureBuilder<Uint8List?>(
-                            future: _thumb(_previewAsset!),
-                            builder: (context, snapshot) {
-                              if (snapshot.data == null) return const SizedBox.shrink();
-                              return Image.memory(snapshot.data!, fit: BoxFit.contain);
-                            },
-                          ),
+                        : AssetPreview(key: ValueKey(_previewAsset!.id), asset: _previewAsset!),
                   ),
                 ),
                 // Bottom: Gallery Grid
