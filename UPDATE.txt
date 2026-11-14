@@ -1,11 +1,14 @@
-SWIFS SETTINGS UPDATE
+SWIFS COMMENTS SHEET UPDATE
 
-In Termux:
+In Termux (install python once with: pkg install python):
   cd ~/swifs
-  unzip -o ~/settings-update.zip
+  unzip -o ~/comments-update.zip
+  python3 scripts/apply_comments.py
   git add -A
-  git commit -m "New settings screen"
+  git commit -m "Comments sheet with replies and heart animation"
   git push
 
-Replaces: app/lib/features/profile/settings_screen.dart
-Uses only your existing SwifsIcon helper and lucide_icons_flutter_plus.
+Adds:
+  app/lib/core/widgets/pop_heart.dart        heart animation + pop sound (same as feed)
+  app/lib/features/comments/comments_sheet.dart   comments sheet
+  scripts/apply_comments.py                  connects the comment icon in the feed
