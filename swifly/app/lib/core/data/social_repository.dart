@@ -1,0 +1,41 @@
+import 'models.dart';
+
+/// Everything the app needs from the server. Screens only talk to this.
+///
+/// "cached..." reads come from the phone and return at once (null if nothing is cached).
+/// "fetch...", "search..." and "suggested..." reads ask the server.
+/// Writes take the desired state (liked = true), so a retry still ends in the right state.
+abstract class SocialRepository {
+  // Find
+  Future<List<Map<String, dynamic>>> suggestedUsers();
+  Future<List<Map<String, dynamic>>> searchUsers(String query);
+  Future<List<String>> fetchTrendingTags();
+  Future<List<Map<String, dynamic>>> fetchTrendingWithUses();
+  Future<List<FeedPost>> fetchExplorePosts();
+  Future<List<FeedPost>> fetchHashtagPosts(String tag);
+
+  // Profile
+  Future<Map<String, dynamic>> fetchMyProfile();
+  Future<Map<String, dynamic>?> cachedMyProfile();
+  Future<List<FeedPost>> fetchMyPosts();
+  Future<List<FeedPost>> fetchSavedPosts();
+
+  // Feed
+  Future<List<FeedPost>?> cachedFeed();
+  Future<List<FeedPost>> fetchFeed();
+
+  // Comments
+  Future<List<CommentModel>?> cachedComments(String postId);
+  Future<List<CommentModel>> fetchComments(String postId);
+
+  // Writes
+  Future<LikeResult> setLike(String postId, bool liked);
+  Future<bool> setSave(String postId, bool saved);
+  Future<bool> setFollow(String authorId, bool following);
+  Future<CommentModel> addComment(String postId, String text, {String? parentId, String? tempId});
+  Future<LikeResult> setCommentLike(String commentId, bool liked);
+  Future<void> createPost(String caption, List<String> filePaths);
+
+  /// Runs one action from the outbox.
+  Future<dynamic> run(OutboxOp op);
+}
