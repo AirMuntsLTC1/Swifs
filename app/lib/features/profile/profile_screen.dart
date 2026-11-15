@@ -243,7 +243,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     post: _tabPosts(idx)[i],
                     onTap: () => Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (_) => PostViewerScreen(post: _tabPosts(idx)[i])),
+                      MaterialPageRoute(builder: (_) => PostFeedScreen(posts: _tabPosts(idx), initialIndex: i)),
                     ),
                   ),
                 );
@@ -271,4 +271,3 @@ class _Stat extends StatelessWidget {
     );
   }
 }
-

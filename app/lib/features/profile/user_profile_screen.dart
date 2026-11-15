@@ -239,7 +239,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
       itemCount: posts.length,
       itemBuilder: (_, i) => PostGridTile(
         post: posts[i],
-        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => PostViewerScreen(post: posts[i]))),
+        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => PostFeedScreen(posts: posts, initialIndex: i))),
       ),
     );
   }

@@ -550,6 +550,258 @@ class _PostViewerScreenState extends State<PostViewerScreen> {
   }
 }
 
+
+/// One post in the Instagram-style feed: header, media, actions, caption.
+class _PostFeedCard extends StatefulWidget {
+  final FeedPost post;
+  const _PostFeedCard({super.key, required this.post});
+
+  @override
+  State<_PostFeedCard> createState() => _PostFeedCardState();
+}
+
+class _PostFeedCardState extends State<_PostFeedCard> {
+  late bool _liked;
+  late int _likes;
+  late bool _saved;
+  late int _comments;
+  late int _shares;
+  List<Map<String, dynamic>> _media = const [];
+  bool _loadingMedia = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _liked = widget.post.liked;
+    _likes = widget.post.likes;
+    _saved = widget.post.isSaved;
+    _comments = widget.post.comments;
+    _shares = widget.post.shares;
+    if (widget.post.media.isNotEmpty) {
+      _media = widget.post.media;
+    } else {
+      _loadingMedia = true;
+      _loadMedia();
+    }
+  }
+
+  Future<void> _loadMedia() async {
+    try {
+      final media = await social.fetchPostMedia(widget.post.id);
+      if (mounted) setState(() => _media = media);
+    } catch (_) {
+      // Keep whatever is shown. The post still opens.
+    } finally {
+      if (mounted) setState(() => _loadingMedia = false);
+    }
+  }
+
+  /// Re-reads likes, comments and shares from the server after a sheet closes.
+  Future<void> _refreshCounts() async {
+    try {
+      final counts = await social.fetchPostCounts([widget.post.id]);
+      final c = counts[widget.post.id];
+      if (c == null || !mounted) return;
+      setState(() {
+        _likes = c['likes'] ?? _likes;
+        _comments = c['comments'] ?? _comments;
+        _shares = c['shares'] ?? _shares;
+      });
+    } catch (_) {
+      // Keep the numbers on screen.
+    }
+  }
+
+  void _toggleLike() {
+    final wasLiked = _liked;
+    final prevLikes = _likes;
+    setState(() {
+      _liked = !wasLiked;
+      _likes = prevLikes + (_liked ? 1 : -1);
+    });
+    InteractionQueue.instance.enqueue(
+      OutboxOp('like:${widget.post.id}', 'like', {'postId': widget.post.id, 'liked': _liked}),
+      onSuccess: (result) {
+        final r = result as LikeResult;
+        if (mounted) setState(() { _liked = r.liked; _likes = r.count; });
+      },
+      onFail: (_) {
+        if (mounted) setState(() { _liked = wasLiked; _likes = prevLikes; });
+      },
+    );
+  }
+
+  void _toggleSave() {
+    final wasSaved = _saved;
+    setState(() => _saved = !wasSaved);
+    InteractionQueue.instance.enqueue(
+      OutboxOp('save:${widget.post.id}', 'save', {'postId': widget.post.id, 'saved': _saved}),
+      onSuccess: (result) {
+        if (mounted) setState(() => _saved = result as bool);
+      },
+      onFail: (_) {
+        if (mounted) setState(() => _saved = wasSaved);
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final ratio = postAspectRatio(_media.isEmpty ? null : _media.first);
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
+          child: Row(
+            children: [
+              UserAvatar(url: widget.post.avatarUrl, name: widget.post.user, radius: 18),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  widget.post.user,
+                  style: const TextStyle(color: _kInk, fontSize: 14, fontWeight: FontWeight.w600),
+                ),
+              ),
+            ],
+          ),
+        ),
+          _loadingMedia && _media.isEmpty
+              ? AspectRatio(aspectRatio: ratio, child: const SwifsSkeletonBox())
+              : SizedBox(
+                  width: double.infinity,
+                  child: PostCarousel(media: _media, ratio: ratio),
+                ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+            child: Row(
+              children: [
+                _ActionButton(
+                  onTap: _toggleLike,
+                  child: _liked
+                      ? const Icon(Icons.favorite, size: 28, color: Colors.red)
+                      : const SwifsIcon(LucideIcons.heart, size: 28, color: _kInk),
+                ),
+                Padding(
+                  padding: const EdgeInsets.only(left: 2, right: 10),
+                  child: Text(compactCount(_likes), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: _kInk)),
+                ),
+                _ActionButton(
+                  onTap: () async {
+                    await showCommentsSheet(context, postId: widget.post.id);
+                    _refreshCounts();
+                  },
+                  child: const SwifsIcon(LucideIcons.messageCircle, size: 28, color: _kInk),
+                ),
+                Padding(
+                  padding: const EdgeInsets.only(left: 2, right: 10),
+                  child: Text(compactCount(_comments), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: _kInk)),
+                ),
+                _ActionButton(
+                  onTap: () => showModalBottomSheet(
+                    context: context,
+                    isScrollControlled: true,
+                    backgroundColor: Colors.transparent,
+                    builder: (_) => ShareBottomSheet(postId: widget.post.id),
+                  ).then((_) => _refreshCounts()),
+                  child: const SwifsIcon(LucideIcons.upload, size: 28, color: _kInk),
+                ),
+                Padding(
+                  padding: const EdgeInsets.only(left: 2, right: 10),
+                  child: Text(compactCount(_shares), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: _kInk)),
+                ),
+                const Spacer(),
+                _ActionButton(
+                  onTap: _toggleSave,
+                  child: _saved
+                      ? const Icon(Icons.bookmark, size: 28, color: _kPrimary)
+                      : const SwifsIcon(LucideIcons.bookmark, size: 28, color: _kInk),
+                ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('$_likes likes', style: const TextStyle(fontWeight: FontWeight.w600, color: _kInk)),
+                const SizedBox(height: 4),
+                Text.rich(TextSpan(children: [
+                  TextSpan(text: '@${widget.post.user} ', style: const TextStyle(fontWeight: FontWeight.w600, color: _kInk)),
+                  TextSpan(text: widget.post.caption, style: const TextStyle(color: _kInk)),
+                ])),
+                if (_comments > 0) ...[
+                  const SizedBox(height: 6),
+                  GestureDetector(
+                    onTap: () => showCommentsSheet(context, postId: widget.post.id),
+                    child: Text('View all $_comments comments', style: const TextStyle(color: _kMuted, fontSize: 13)),
+                  ),
+                ],
+                const SizedBox(height: 24),
+              ],
+            ),
+          ),
+        ],
+    );
+  }
+}
+
+
+/// Vertical feed of posts, like Instagram's "Posts" screen. It opens on the tapped post,
+/// and you scroll up for newer posts and down for older ones.
+class PostFeedScreen extends StatelessWidget {
+  final List<FeedPost> posts;
+  final int initialIndex;
+
+  const PostFeedScreen({super.key, required this.posts, required this.initialIndex});
+
+  // The centre of the scroll view is the tapped post. Posts before it are laid out upward.
+  static const Key _centerKey = ValueKey('posts-center');
+
+  @override
+  Widget build(BuildContext context) {
+    final start = initialIndex.clamp(0, posts.isEmpty ? 0 : posts.length - 1);
+    return Scaffold(
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.white,
+        elevation: 0,
+        leading: IconButton(
+          icon: const SwifsIcon(LucideIcons.arrowLeft, color: _kInk),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: const Text('Posts', style: TextStyle(color: _kInk, fontSize: 18, fontWeight: FontWeight.w600)),
+      ),
+      body: CustomScrollView(
+        center: _centerKey,
+        slivers: [
+          SliverList(
+            delegate: SliverChildBuilderDelegate(
+              (_, i) {
+                final p = posts[start - 1 - i];
+                return _PostFeedCard(key: ValueKey('feed-${p.id}'), post: p);
+              },
+              childCount: start,
+            ),
+          ),
+          SliverList(
+            key: _centerKey,
+            delegate: SliverChildBuilderDelegate(
+              (_, i) {
+                final p = posts[start + i];
+                return _PostFeedCard(key: ValueKey('feed-${p.id}'), post: p);
+              },
+              childCount: posts.length - start,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
 class _ActionButton extends StatelessWidget {
   final VoidCallback onTap;
   final Widget child;
