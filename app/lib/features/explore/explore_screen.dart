@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math';
 import 'package:flutter/material.dart';
 import '../../core/notifications/realtime_notification_service.dart';
 import 'package:pull_to_refresh_flutter3/pull_to_refresh_flutter3.dart';
@@ -9,6 +10,7 @@ import '../../core/data/models.dart';
 import '../../core/data/social.dart';
 import '../../core/widgets/post_media.dart';
 import 'hashtag_screen.dart';
+import 'reels_screen.dart';
 import 'search_screen.dart';
 import 'saved_posts_screen.dart';
 import '../../core/widgets/swifs_skeleton.dart';
@@ -98,7 +100,11 @@ class _ExploreScreenState extends State<ExploreScreen> {
   }
 
   void _openPost(FeedPost post) {
-    Navigator.push(context, slideRoute(PostViewerScreen(post: post)));
+    final rest = _posts.where((p) => p.id != post.id).toList()..shuffle(Random());
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => ReelsScreen(posts: [post, ...rest])),
+    );
   }
 
   @override
