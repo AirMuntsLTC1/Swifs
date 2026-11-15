@@ -159,7 +159,6 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
                 decoration: BoxDecoration(color: const Color(0xFFF0F2F5), borderRadius: BorderRadius.circular(12)),
                 child: TextField(
                   controller: _search,
-                  onChanged: (_) => setState(() {}),
                   decoration: const InputDecoration(
                     hintText: 'Search',
                     hintStyle: TextStyle(color: kMuted),

@@ -184,8 +184,8 @@ class _MainShellState extends State<MainShell> {
       
       // Custom Navigation Bar
       bottomNavigationBar: Container(
-        height: 56 + MediaQuery.of(context).padding.bottom,
-        padding: EdgeInsets.only(bottom: MediaQuery.of(context).padding.bottom),
+        height: 56 + MediaQuery.paddingOf(context).bottom,
+        padding: EdgeInsets.only(bottom: MediaQuery.paddingOf(context).bottom),
         decoration: const BoxDecoration(
           color: Colors.white,
           border: Border(top: BorderSide(color: Color(0xFFF0F2F5), width: 1)),

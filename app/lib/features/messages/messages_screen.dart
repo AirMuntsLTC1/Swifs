@@ -30,7 +30,7 @@ class _MessagesScreenState extends State<MessagesScreen> {
   List<Conversation> _all = [];
   List<NoteItem> _notes = [];
   String _tab = 'primary';
-  String _query = '';
+  final TextEditingController _searchCtrl = TextEditingController();
   bool _loading = true;
   String _myHandle = '';
   Timer? _debounce;
@@ -51,6 +51,7 @@ class _MessagesScreenState extends State<MessagesScreen> {
   @override
   void dispose() {
     _hubSub?.cancel();
+    _searchCtrl.dispose();
     _debounce?.cancel();
     super.dispose();
   }
@@ -88,7 +89,7 @@ class _MessagesScreenState extends State<MessagesScreen> {
   }
 
   List<Conversation> get _visible {
-    final q = _query.trim().toLowerCase();
+    final q = _searchCtrl.text.trim().toLowerCase();
     return _all.where((c) {
       if (c.tier != _tab) return false;
       if (q.isEmpty) return true;
@@ -240,7 +241,7 @@ class _MessagesScreenState extends State<MessagesScreen> {
               height: 40,
               decoration: BoxDecoration(color: _kPill, borderRadius: BorderRadius.circular(12)),
               child: TextField(
-                onChanged: (v) => setState(() => _query = v),
+                controller: _searchCtrl,
                 decoration: const InputDecoration(
                   hintText: 'Search',
                   hintStyle: TextStyle(color: _kMuted),
@@ -296,7 +297,9 @@ class _MessagesScreenState extends State<MessagesScreen> {
           Expanded(
             child: _loading
                 ? const LoadingList()
-                : RefreshIndicator(
+                : ValueListenableBuilder<TextEditingValue>(
+                    valueListenable: _searchCtrl,
+                    builder: (_, __, ___) => RefreshIndicator(
                     color: _kPrimary,
                     onRefresh: _load,
                     child: _visible.isEmpty
@@ -317,6 +320,7 @@ class _MessagesScreenState extends State<MessagesScreen> {
                             itemCount: _visible.length,
                             itemBuilder: (_, i) => _tile(_visible[i]),
                           ),
+                  ),
                   ),
           ),
         ],
@@ -540,7 +544,7 @@ class _ComposeSheetState extends State<_ComposeSheet> {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: MediaQuery.of(context).size.height * 0.7,
+      height: MediaQuery.sizeOf(context).height * 0.7,
       child: Column(
         children: [
           const SizedBox(height: 8),

@@ -135,7 +135,7 @@ class _StoryViewerScreenState extends State<StoryViewerScreen> with SingleTicker
   @override
   Widget build(BuildContext context) {
     final story = _story;
-    final width = MediaQuery.of(context).size.width;
+    final width = MediaQuery.sizeOf(context).width;
 
     return Scaffold(
       backgroundColor: Colors.black,

@@ -292,7 +292,7 @@ class _ThreadScreenState extends State<ThreadScreen> {
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
       builder: (ctx) => SizedBox(
-        height: MediaQuery.of(ctx).size.height * 0.6,
+        height: MediaQuery.sizeOf(ctx).height * 0.6,
         child: Column(
           children: [
             const SizedBox(height: 12),
@@ -499,7 +499,7 @@ class _ThreadScreenState extends State<ThreadScreen> {
 
   Widget _bubble(DirectMessage m, bool mine) {
     final quoted = _findMessage(m.replyToId);
-    final maxWidth = MediaQuery.of(context).size.width * 0.72;
+    final maxWidth = MediaQuery.sizeOf(context).width * 0.72;
 
     final content = <Widget>[];
     if (m.sharedPostId != null) {
@@ -740,7 +740,7 @@ class _MessageMenu extends StatelessWidget {
                 const SizedBox(height: 12),
                 // The message itself
                 ConstrainedBox(
-                  constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.72),
+                  constraints: BoxConstraints(maxWidth: MediaQuery.sizeOf(context).width * 0.72),
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
                     decoration: BoxDecoration(
@@ -753,7 +753,7 @@ class _MessageMenu extends StatelessWidget {
                 const SizedBox(height: 12),
                 // Action card
                 Container(
-                  width: MediaQuery.of(context).size.width * 0.62,
+                  width: MediaQuery.sizeOf(context).width * 0.62,
                   decoration: BoxDecoration(color: _kMenuDark, borderRadius: BorderRadius.circular(16)),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
