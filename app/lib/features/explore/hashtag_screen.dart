@@ -13,9 +13,9 @@ const Color _kPrimary = Color(0xFFFF6B35);
 
 class HashtagScreen extends StatefulWidget {
   final String tag;
-  final int uses;
+  final int? uses;
 
-  const HashtagScreen({super.key, required this.tag, required this.uses});
+  const HashtagScreen({super.key, required this.tag, this.uses});
 
   @override
   State<HashtagScreen> createState() => _HashtagScreenState();
@@ -55,7 +55,8 @@ class _HashtagScreenState extends State<HashtagScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final usesLabel = '${widget.uses} ${widget.uses == 1 ? 'user' : 'users'} use this';
+    final uses = widget.uses;
+    final usesLabel = uses == null ? '' : '$uses ${uses == 1 ? 'user' : 'users'} use this';
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(

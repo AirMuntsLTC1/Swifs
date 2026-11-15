@@ -1,5 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'follow_list_screen.dart';
 import '../../core/notifications/realtime_notification_service.dart';
 import 'package:pull_to_refresh_flutter3/pull_to_refresh_flutter3.dart';
 import '../../core/theme/swifs_refresh.dart';
@@ -21,6 +23,14 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
+  void _openFollows({required bool followers}) {
+    final me = Supabase.instance.client.auth.currentUser?.id;
+    if (me == null) return;
+    Navigator.push(context, MaterialPageRoute(
+      builder: (_) => FollowListScreen(userId: me, followers: followers),
+    ));
+  }
+
   final RefreshController _refreshController = RefreshController(initialRefresh: false);
   Map<String, dynamic> _profile = {};
   List<FeedPost> _posts = [];
@@ -141,8 +151,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               mainAxisAlignment: MainAxisAlignment.spaceAround,
                               children: [
                                 _Stat('${_posts.length}', 'Posts'),
-                                _Stat('${_profile['followers_count'] ?? 0}', 'Followers'),
-                                _Stat('${_profile['following_count'] ?? 0}', 'Following'),
+                                _Stat('${_profile['followers_count'] ?? 0}', 'Followers', onTap: () => _openFollows(followers: true)),
+                                _Stat('${_profile['following_count'] ?? 0}', 'Following', onTap: () => _openFollows(followers: false)),
                               ],
                             ),
                           ),
@@ -259,15 +269,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
 class _Stat extends StatelessWidget {
   final String value;
   final String label;
-  const _Stat(this.value, this.label);
+  final VoidCallback? onTap;
+  const _Stat(this.value, this.label, {this.onTap});
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Text(value, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
-        const SizedBox(height: 2),
-        Text(label, style: const TextStyle(color: Colors.grey, fontSize: 12)),
-      ],
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Column(
+        children: [
+          Text(value, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
+          const SizedBox(height: 2),
+          Text(label, style: const TextStyle(color: Colors.grey, fontSize: 12)),
+        ],
+      ),
     );
   }
 }

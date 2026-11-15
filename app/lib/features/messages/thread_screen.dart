@@ -14,6 +14,8 @@ import '../../core/widgets/swifs_skeleton.dart';
 import '../../core/data/social.dart';
 import '../../core/data/models.dart';
 import '../../core/widgets/route_defer.dart';
+import '../../core/feedback/swifs_feedback.dart';
+import '../../core/widgets/linked_text.dart';
 import '../explore/reels_screen.dart';
 
 const Color _kPrimary = Color(0xFFFF6B35);
@@ -582,7 +584,7 @@ class _ThreadScreenState extends State<ThreadScreen> {
 
     return GestureDetector(
       onLongPress: () {
-        HapticFeedback.mediumImpact();
+        SwifsFeedback.longPress();
         _openMenu(m);
       },
       onTap: m.failed ? () => _retry(m) : null,

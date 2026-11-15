@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import '../feedback/swifs_feedback.dart';
 
 /// Instagram-style double tap. Shows a heart burst exactly where the finger
 /// landed. [onLike] runs on every double tap; pass [alreadyLiked] so a post
@@ -40,11 +40,11 @@ class _DoubleTapLikeState extends State<DoubleTapLike>
   }
 
   void _onDoubleTap() {
+    // A new like is felt by the caller's like handler (once). Re-liking only ticks.
     if (!widget.alreadyLiked) {
-      HapticFeedback.lightImpact();
       widget.onLike();
     } else {
-      HapticFeedback.selectionClick();
+      SwifsFeedback.unlike();
     }
     setState(() => _visible = true);
     _controller.forward(from: 0).whenComplete(() {

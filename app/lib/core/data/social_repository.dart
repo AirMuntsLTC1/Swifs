@@ -51,6 +51,8 @@ abstract class SocialRepository {
   /// Deletes every notification for the signed-in user, then checks that none remain.
   Future<void> deleteAllNotifications();
   Future<Map<String, dynamic>> fetchUserProfile(String userId);
+  /// People who follow [userId] (followers: true), or whom [userId] follows.
+  Future<List<Map<String, dynamic>>> fetchFollowList(String userId, {required bool followers});
   Future<List<FeedPost>> fetchUserPosts(String userId);
   Future<void> blockUser(String userId);
 
@@ -61,5 +63,3 @@ abstract class SocialRepository {
   Future<void> restrictUser(String userId);
 
 }
-
-

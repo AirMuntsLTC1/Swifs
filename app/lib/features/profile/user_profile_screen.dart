@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'follow_list_screen.dart';
 import 'package:lucide_icons_flutter_plus/lucide_icons_flutter_plus.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../main.dart';
@@ -25,6 +26,12 @@ class UserProfileScreen extends StatefulWidget {
 }
 
 class _UserProfileScreenState extends State<UserProfileScreen> {
+  void _openFollows({required bool followers}) {
+    Navigator.push(context, MaterialPageRoute(
+      builder: (_) => FollowListScreen(userId: widget.userId, followers: followers),
+    ));
+  }
+
   Map<String, dynamic> _profile = {};
   List<FeedPost> _posts = [];
   bool _loading = true;
@@ -139,8 +146,8 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                                   mainAxisAlignment: MainAxisAlignment.spaceAround,
                                   children: [
                                     _Stat('${_profile['posts_count'] ?? 0}', 'Posts'),
-                                    _Stat('${_profile['followers_count'] ?? 0}', 'Followers'),
-                                    _Stat('${_profile['following_count'] ?? 0}', 'Following'),
+                                    _Stat('${_profile['followers_count'] ?? 0}', 'Followers', onTap: () => _openFollows(followers: true)),
+                                    _Stat('${_profile['following_count'] ?? 0}', 'Following', onTap: () => _openFollows(followers: false)),
                                   ],
                                 ),
                               ),
@@ -248,15 +255,20 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
 class _Stat extends StatelessWidget {
   final String value;
   final String label;
-  const _Stat(this.value, this.label);
+  final VoidCallback? onTap;
+  const _Stat(this.value, this.label, {this.onTap});
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Text(value, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16, color: kInk)),
-        const SizedBox(height: 2),
-        Text(label, style: const TextStyle(color: kMuted, fontSize: 12)),
-      ],
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Column(
+        children: [
+          Text(value, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16, color: kInk)),
+          const SizedBox(height: 2),
+          Text(label, style: const TextStyle(color: kMuted, fontSize: 12)),
+        ],
+      ),
     );
   }
 }

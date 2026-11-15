@@ -5,6 +5,7 @@ import '../../core/data/social.dart';
 import '../../core/network/interaction_queue.dart';
 import '../../core/widgets/pop_heart.dart';
 import '../../core/widgets/user_avatar.dart';
+import '../../core/widgets/linked_text.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/widgets/keyboard_inset.dart';
 
@@ -392,7 +393,7 @@ class _CommentsSheetState extends State<CommentsSheet> {
                   ],
                 ),
                 const SizedBox(height: 2),
-                Text(c.text, style: const TextStyle(fontSize: 14, height: 1.3, color: kInk)),
+                LinkifiedText(c.text, style: const TextStyle(fontSize: 14, height: 1.3, color: kInk)),
                 const SizedBox(height: 2),
                 GestureDetector(
                   behavior: HitTestBehavior.opaque,

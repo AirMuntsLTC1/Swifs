@@ -1,16 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:audioplayers/audioplayers.dart';
+import '../feedback/swifs_feedback.dart';
 import 'package:lucide_icons_flutter_plus/lucide_icons_flutter_plus.dart';
 import '../theme/swifs_icon.dart';
 
-/// Same bubble pop sound the feed uses.
-void playPopSound() {
-  try {
-    final player = AudioPlayer();
-    player.play(AssetSource('sounds/bubble_pop.mp3')).catchError((_) {});
-    player.onPlayerComplete.listen((_) => player.dispose());
-  } catch (_) {}
-}
+/// Same bubble pop sound the feed uses (shared player, see SwifsFeedback).
+void playPopSound() => SwifsFeedback.pop();
 
 /// Heart with the same bounce + floating hearts + pop sound as the feed.
 class PopHeart extends StatefulWidget {
@@ -39,7 +33,7 @@ class _PopHeartState extends State<PopHeart> {
     widget.onTap();
     if (wasActive) return;
 
-    playPopSound();
+    SwifsFeedback.like(); // vibration + pop, once
     setState(() => _scale = 1.3);
     Future.delayed(const Duration(milliseconds: 100), () {
       if (mounted) setState(() => _scale = 1.0);
@@ -147,5 +141,3 @@ class _FloatingHeartsState extends State<_FloatingHearts>
     );
   }
 }
-
-

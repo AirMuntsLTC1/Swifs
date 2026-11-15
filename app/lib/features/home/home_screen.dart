@@ -12,6 +12,8 @@ import '../../core/data/social.dart';
 import 'package:flutter/services.dart';
 import '../../core/widgets/post_media.dart';
 import '../../core/widgets/double_tap_like.dart';
+import '../../core/feedback/swifs_feedback.dart';
+import '../../core/widgets/linked_text.dart';
 import '../../core/widgets/user_avatar.dart';
 import '../../core/widgets/story_ring.dart';
 import '../../core/data/stories_repository.dart';
@@ -39,7 +41,6 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   late List<Map<String, dynamic>> _posts;
-  final AudioPlayer _audioPlayer = AudioPlayer();
   final RefreshController _refreshController = RefreshController(initialRefresh: false);
   bool _loading = true;
   static const int _pageSize = 10;
@@ -79,8 +80,6 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     _posts = [];
 
-    // Low latency mode for the like sound, so taps play without a startup delay.
-    _audioPlayer.setPlayerMode(PlayerMode.lowLatency).catchError((_) {});
     _scroll.addListener(_onScroll);
     _realtimeSub = RealtimeHub.instance.changes.listen(_onRealtime);
     _loadFeed();
@@ -93,7 +92,6 @@ class _HomeScreenState extends State<HomeScreen> {
   void dispose() {
     StoriesRepository.uploadProgress.removeListener(_onStoryUploadChanged);
     StoriesRepository.uploadError.removeListener(_onStoryError);
-    _audioPlayer.dispose();
     _refreshController.dispose();
     _scroll.dispose();
     _realtimeDebounce?.cancel();
@@ -101,16 +99,8 @@ class _HomeScreenState extends State<HomeScreen> {
     super.dispose();
   }
 
-  /// Plays the like sound on the one player this screen owns (low latency mode).
-  /// Creating a new AudioPlayer per tap allocated a native player each time and
-  /// leaked it until it finished, which stuttered the UI on busy scrolling.
-  Future<void> _playPopSound() async {
-    try {
-      await _audioPlayer.play(AssetSource('sounds/bubble_pop.mp3'));
-    } catch (_) {
-      // Sound is optional. A failed pop must never affect the UI.
-    }
-  }
+  /// The pop sound for saves. The shared SwifsFeedback helper owns the player.
+  Future<void> _playPopSound() => SwifsFeedback.pop();
 
   Map<String, dynamic>? _findPost(String id) {
     for (final post in _posts) {
@@ -266,10 +256,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final prevLikes = (post['likes'] as num).toInt();
     final prevScore = post['score'];
     final nowLiked = !wasLiked;
-    if (nowLiked) {
-      HapticFeedback.lightImpact();
-      _playPopSound();
-    }
+    if (nowLiked) SwifsFeedback.like(); // vibration + pop, once
 
     setState(() {
       post['liked'] = nowLiked;
@@ -655,7 +642,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   const SizedBox(height: 4),
                   Text.rich(TextSpan(children: [
                     TextSpan(text: '@${p['user']} ', style: const TextStyle(fontWeight: FontWeight.w500)),
-                    TextSpan(text: p['caption']),
+                    ...LinkifiedText.spans(context, (p['caption'] ?? '').toString()),
                   ])),
                 ]),
               ),

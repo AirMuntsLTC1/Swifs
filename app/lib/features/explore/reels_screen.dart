@@ -1,6 +1,7 @@
 import 'dart:math';
 
 import 'package:flutter/material.dart';
+import '../../core/feedback/swifs_feedback.dart';
 import 'package:flutter/services.dart';
 import 'package:lucide_icons_flutter_plus/lucide_icons_flutter_plus.dart';
 import '../../core/auth/current_user.dart';
@@ -142,7 +143,7 @@ class _ReelPageState extends State<_ReelPage> {
     final wasLiked = _liked;
     final prevLikes = _likes;
     final nowLiked = !wasLiked;
-    if (nowLiked) HapticFeedback.lightImpact();
+    if (nowLiked) SwifsFeedback.like(); // vibration + pop, once
     setState(() {
       _liked = nowLiked;
       _likes = prevLikes + (nowLiked ? 1 : -1);

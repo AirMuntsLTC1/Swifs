@@ -650,6 +650,19 @@ class SupabaseSocialRepository implements SocialRepository {
   // ------------------------------------------------------------------
 
   @override
+  Future<List<Map<String, dynamic>>> fetchFollowList(String userId, {required bool followers}) => _guard(() async {
+        final anchor = followers ? 'followee' : 'follower';
+        final other = followers ? 'follower' : 'followee';
+        final rows = await _db.from('follows').select(other).eq(anchor, userId).limit(500);
+        final ids = [for (final r in rows) r[other].toString()];
+        if (ids.isEmpty) return <Map<String, dynamic>>[];
+        final profiles = await _db
+            .from('profiles')
+            .select('id, username, display_name, avatar_url')
+            .inFilter('id', ids);
+        return profiles.map((p) => Map<String, dynamic>.from(p)).toList();
+      });
+
   Future<Map<String, dynamic>> fetchUserProfile(String userId) => _guard(() async {
         final me = _me;
         
