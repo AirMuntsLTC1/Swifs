@@ -22,8 +22,10 @@ const Color _kReelPrimary = Color(0xFFFF6B35);
 class ReelsScreen extends StatefulWidget {
   /// The first post is the one you tapped. The rest are shuffled.
   final List<FeedPost> posts;
+  /// Shown at the top. Explore uses 'Explore'. A chat shows the sender's name.
+  final String title;
 
-  const ReelsScreen({super.key, required this.posts});
+  const ReelsScreen({super.key, required this.posts, this.title = 'Explore'});
 
   @override
   State<ReelsScreen> createState() => _ReelsScreenState();
@@ -38,6 +40,8 @@ class _ReelsScreenState extends State<ReelsScreen> {
   void initState() {
     super.initState();
     _seen.addAll(_posts.map((p) => p.id));
+    // A single shared post still needs more posts to swipe to.
+    if (_posts.length < 4) _refill();
   }
 
   /// Loads more Explore posts in a random order. Posts already shown come last.
@@ -92,8 +96,8 @@ class _ReelsScreenState extends State<ReelsScreen> {
                       icon: const SwifsIcon(LucideIcons.arrowLeft, color: Colors.white),
                       onPressed: () => Navigator.pop(context),
                     ),
-                    const Text(
-                      'Explore',
+                    Text(
+                      widget.title,
                       style: TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w600),
                     ),
                   ],

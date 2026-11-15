@@ -15,6 +15,7 @@ import '../../core/widgets/swifs_skeleton.dart';
 import '../../core/data/social.dart';
 import '../../core/data/models.dart';
 import '../../core/widgets/route_defer.dart';
+import '../explore/reels_screen.dart';
 
 const Color _kPrimary = Color(0xFFFF6B35);
 const Color _kInk = Color(0xFF111111);
@@ -808,7 +809,7 @@ class SharedPostWidget extends StatelessWidget {
         final thumb = post == null ? null : (post.thumbUrl ?? post.mediaUrl);
         final ratio = postAspectRatio(post != null && post.media.isNotEmpty ? post.media.first : null);
         return GestureDetector(
-          onTap: post == null ? null : () => Navigator.push(context, slideRoute(PostViewerScreen(post: post))),
+          onTap: post == null ? null : () => Navigator.push(context, MaterialPageRoute(builder: (_) => ReelsScreen(posts: [post], title: '@${post.user}'))),
           child: Container(
             width: 220,
             margin: const EdgeInsets.only(bottom: 6),
