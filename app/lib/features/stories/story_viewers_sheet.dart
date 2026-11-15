@@ -4,6 +4,7 @@ import '../../core/data/models.dart';
 import '../../core/data/social.dart';
 import '../../core/theme/swifs_icon.dart';
 import '../../core/widgets/user_avatar.dart';
+import '../../core/widgets/swifs_skeleton.dart';
 
 const Color kPrimary = Color(0xFFFF6B35);
 const Color kInk = Color(0xFF111111);
@@ -135,7 +136,7 @@ class _StoryViewersSheetState extends State<StoryViewersSheet> {
           // List of Viewers
           Expanded(
             child: _loading
-                ? const Center(child: CircularProgressIndicator(color: kPrimary))
+                ? const LoadingList()
                 : _viewers.isEmpty
                     ? const Center(child: Text('No viewers yet', style: TextStyle(color: kMuted)))
                     : ListView.separated(

@@ -5,6 +5,7 @@ import '../../core/theme/swifs_icon.dart';
 import 'package:lucide_icons_flutter_plus/lucide_icons_flutter_plus.dart';
 import '../../core/data/social.dart';
 import '../../core/widgets/user_avatar.dart';
+import '../../core/widgets/swifs_skeleton.dart';
 
 const Color kPrimary = Color(0xFFFF6B35);
 
@@ -120,7 +121,7 @@ class _SearchScreenState extends State<SearchScreen> {
 
   Widget _body() {
     if (_loading && _users.isEmpty) {
-      return const Center(child: CircularProgressIndicator(color: kPrimary));
+      return const LoadingList();
     }
     if (_error != null && _users.isEmpty) {
       return Center(child: Padding(

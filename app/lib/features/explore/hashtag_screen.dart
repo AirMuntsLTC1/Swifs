@@ -4,6 +4,7 @@ import '../../core/data/models.dart';
 import '../../core/data/social.dart';
 import '../../core/theme/swifs_icon.dart';
 import '../../core/widgets/post_media.dart';
+import '../../core/widgets/swifs_skeleton.dart';
 
 const Color _kInk = Color(0xFF111111);
 const Color _kMuted = Color(0xFF8E8E93);
@@ -114,7 +115,7 @@ class _HashtagScreenState extends State<HashtagScreen> {
 
   Widget _body() {
     if (_loading) {
-      return const Center(child: CircularProgressIndicator(color: _kPrimary));
+      return const LoadingGrid();
     }
     if (_error != null) {
       return Center(

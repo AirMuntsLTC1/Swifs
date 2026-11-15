@@ -4,6 +4,7 @@ import '../../core/data/messages_repository.dart';
 import '../../core/theme/swifs_icon.dart';
 import '../../core/widgets/user_avatar.dart';
 import 'create_group_screen.dart';
+import '../../core/widgets/swifs_skeleton.dart';
 
 const Color kPrimary = Color(0xFFFF6B35);
 const Color kInk = Color(0xFF111111);
@@ -156,7 +157,7 @@ class _ShareBottomSheetState extends State<ShareBottomSheet> {
           // Users List
           Expanded(
             child: _loading
-                ? const Center(child: CircularProgressIndicator(color: kPrimary))
+                ? const LoadingList()
                 : ListView.builder(
                     itemCount: filtered.length,
                     itemBuilder: (_, i) {

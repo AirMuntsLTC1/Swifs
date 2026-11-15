@@ -230,3 +230,32 @@ class ListRowsSkeleton extends StatelessWidget {
     );
   }
 }
+
+/// Loading state for any list screen. Fills the space it is given and never scrolls
+/// on its own, so it can sit inside Expanded, tabs, or sheets without layout errors.
+class LoadingList extends StatelessWidget {
+  const LoadingList({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return const SingleChildScrollView(
+      physics: NeverScrollableScrollPhysics(),
+      child: ListRowsSkeleton(rows: 8),
+    );
+  }
+}
+
+/// Loading state for photo grids (profile, explore, saved, hashtag, gallery).
+class LoadingGrid extends StatelessWidget {
+  final int count;
+
+  const LoadingGrid({super.key, this.count = 12});
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      physics: const NeverScrollableScrollPhysics(),
+      child: GridSkeleton(count: count),
+    );
+  }
+}

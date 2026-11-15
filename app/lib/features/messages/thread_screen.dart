@@ -436,7 +436,7 @@ class _ThreadScreenState extends State<ThreadScreen> {
             ),
           Expanded(
             child: _loading
-                ? const Center(child: CircularProgressIndicator(color: _kPrimary))
+                ? const LoadingList()
                 : items.isEmpty
                     ? const Center(child: Text('Say hi 👋', style: TextStyle(color: _kMuted, fontSize: 15)))
                     : ListView.builder(
@@ -916,5 +916,3 @@ class _AppearAnimationState extends State<_AppearAnimation> with SingleTickerPro
     );
   }
 }
-
-

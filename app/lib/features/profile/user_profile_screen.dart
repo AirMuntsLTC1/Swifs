@@ -8,6 +8,7 @@ import '../../core/theme/swifs_icon.dart';
 import '../../core/widgets/post_media.dart';
 import '../../core/widgets/user_avatar.dart';
 import '../messages/thread_screen.dart';
+import '../../core/widgets/swifs_skeleton.dart';
 
 const Color kPrimary = Color(0xFFFF6B35);
 const Color kBlue = Color(0xFF1877F2);
@@ -111,7 +112,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
         centerTitle: true,
       ),
       body: _loading
-          ? const Center(child: CircularProgressIndicator(color: kPrimary))
+          ? const LoadingGrid()
           : DefaultTabController(
               length: 2,
               child: NestedScrollView(

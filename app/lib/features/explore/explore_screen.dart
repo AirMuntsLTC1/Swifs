@@ -11,6 +11,7 @@ import '../../core/widgets/post_media.dart';
 import 'hashtag_screen.dart';
 import 'search_screen.dart';
 import 'saved_posts_screen.dart';
+import '../../core/widgets/swifs_skeleton.dart';
 
 const Color kPrimary = Color(0xFFFF6B35);
 const Color kHashtagBlue = Color(0xFF1877F2);
@@ -220,7 +221,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
               const SliverToBoxAdapter(
                 child: SizedBox(
                   height: 260,
-                  child: Center(child: CircularProgressIndicator(color: kPrimary)),
+                  child: LoadingGrid(count: 6),
                 ),
               )
             else if (_posts.isEmpty)

@@ -4,6 +4,7 @@ import '../../core/cache/local_cache.dart';
 import '../../core/data/settings_repository.dart';
 import 'package:lucide_icons_flutter_plus/lucide_icons_flutter_plus.dart';
 import '../../core/theme/swifs_icon.dart';
+import '../../core/widgets/swifs_skeleton.dart';
 
 const Color kPrimary = Color(0xFFFF6B35);
 const Color kInk = Color(0xFF111111);
@@ -532,7 +533,7 @@ class _BlockedPageState extends State<_BlockedPage> {
   Widget build(BuildContext context) {
     Widget body;
     if (_loading) {
-      body = const Center(child: CircularProgressIndicator(color: kPrimary));
+      body = const LoadingList();
     } else if (_error != null) {
       body = Center(child: Text(_error!, style: const TextStyle(color: kMuted)));
     } else if (_people.isEmpty) {

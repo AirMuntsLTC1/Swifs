@@ -3,6 +3,7 @@ import 'package:lucide_icons_flutter_plus/lucide_icons_flutter_plus.dart';
 import '../../core/data/messages_repository.dart';
 import '../../core/theme/swifs_icon.dart';
 import '../../core/widgets/user_avatar.dart';
+import '../../core/widgets/swifs_skeleton.dart';
 
 const Color kPrimary = Color(0xFFFF6B35);
 const Color kInk = Color(0xFF111111);
@@ -177,7 +178,7 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
             const SizedBox(height: 8),
             Expanded(
               child: _loading
-                  ? const Center(child: CircularProgressIndicator(color: kPrimary))
+                  ? const LoadingList()
                   : ListView.builder(
                       itemCount: _users.length,
                       itemBuilder: (_, i) {

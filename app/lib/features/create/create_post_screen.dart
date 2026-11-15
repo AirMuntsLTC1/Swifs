@@ -5,6 +5,7 @@ import 'package:photo_manager/photo_manager.dart';
 import '../../core/widgets/asset_preview.dart';
 import '../../core/theme/swifs_icon.dart';
 import '../../core/data/social.dart';
+import '../../core/widgets/swifs_skeleton.dart';
 
 const Color kPrimary = Color(0xFFFF6B35);
 const Color kInk = Color(0xFF111111);
@@ -123,7 +124,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
         ],
       ),
       body: _loading
-          ? const Center(child: CircularProgressIndicator(color: kPrimary))
+          ? const LoadingGrid()
           : Column(
               children: [
                 // Top: Media Viewer

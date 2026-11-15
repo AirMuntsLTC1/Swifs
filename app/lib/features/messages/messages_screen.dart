@@ -10,6 +10,7 @@ import '../../core/data/social.dart';
 import '../../core/theme/swifs_icon.dart';
 import '../../core/widgets/user_avatar.dart';
 import 'thread_screen.dart';
+import '../../core/widgets/swifs_skeleton.dart';
 
 const Color _kPrimary = Color(0xFFFF6B35);
 const Color _kInk = Color(0xFF111111);
@@ -302,7 +303,7 @@ class _MessagesScreenState extends State<MessagesScreen> {
           // List
           Expanded(
             child: _loading
-                ? const Center(child: CircularProgressIndicator(color: _kPrimary))
+                ? const LoadingList()
                 : RefreshIndicator(
                     color: _kPrimary,
                     onRefresh: _load,
@@ -574,7 +575,7 @@ class _ComposeSheetState extends State<_ComposeSheet> {
           ),
           Expanded(
             child: _loading
-                ? const Center(child: CircularProgressIndicator(color: _kPrimary))
+                ? const LoadingList()
                 : _users.isEmpty
                     ? const Center(child: Text('No people found', style: TextStyle(color: _kMuted)))
                     : ListView.builder(

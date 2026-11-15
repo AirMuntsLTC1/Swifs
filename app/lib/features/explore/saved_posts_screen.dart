@@ -4,6 +4,7 @@ import '../../core/data/models.dart';
 import '../../core/data/social.dart';
 import '../../core/theme/swifs_icon.dart';
 import '../../core/widgets/post_media.dart';
+import '../../core/widgets/swifs_skeleton.dart';
 
 const Color kPrimary = Color(0xFFFF6B35);
 const Color kInk = Color(0xFF111111);
@@ -54,7 +55,7 @@ class _SavedPostsScreenState extends State<SavedPostsScreen> {
         ],
       ),
       body: _loading
-          ? const Center(child: CircularProgressIndicator(color: kPrimary))
+          ? const LoadingGrid()
           : _posts.isEmpty
               ? _emptyState()
               : GridView.builder(
