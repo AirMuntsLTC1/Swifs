@@ -11,6 +11,7 @@ import '../../core/theme/swifs_icon.dart';
 import '../../core/widgets/user_avatar.dart';
 import 'thread_screen.dart';
 import '../../core/widgets/swifs_skeleton.dart';
+import '../../core/widgets/keyboard_inset.dart';
 
 const Color _kPrimary = Color(0xFFFF6B35);
 const Color _kInk = Color(0xFF111111);
@@ -124,13 +125,8 @@ class _MessagesScreenState extends State<MessagesScreen> {
       isScrollControlled: true,
       backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
-      builder: (ctx) => Padding(
-        padding: EdgeInsets.only(
-          left: 16,
-          right: 16,
-          top: 16,
-          bottom: MediaQuery.of(ctx).viewInsets.bottom + 16,
-        ),
+      builder: (ctx) => KeyboardInset(
+        basePadding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
