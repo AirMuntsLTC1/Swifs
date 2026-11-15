@@ -78,6 +78,28 @@ class SwifsApp extends StatelessWidget {
   }
 }
 
+/// Keeps a tab alive while another tab is showing, so switching back does not reload it.
+/// The slide animation stays the same.
+class _KeepAlivePage extends StatefulWidget {
+  final Widget child;
+
+  const _KeepAlivePage({required this.child});
+
+  @override
+  State<_KeepAlivePage> createState() => _KeepAlivePageState();
+}
+
+class _KeepAlivePageState extends State<_KeepAlivePage> with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    return widget.child;
+  }
+}
+
 class MainShell extends StatefulWidget {
   const MainShell({super.key});
 
@@ -156,7 +178,7 @@ class _MainShellState extends State<MainShell> {
         controller: _pageController,
         physics: const NeverScrollableScrollPhysics(), // Prevents swiping with fingers, forces tab taps
         onPageChanged: (index) => setState(() => _index = index),
-        children: _screens,
+        children: [for (final s in _screens) _KeepAlivePage(child: s)],
       ),
       ),
       

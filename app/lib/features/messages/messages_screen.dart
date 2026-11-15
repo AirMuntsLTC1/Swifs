@@ -32,7 +32,6 @@ class _MessagesScreenState extends State<MessagesScreen> {
   String _query = '';
   bool _loading = true;
   String _myHandle = '';
-  RealtimeChannel? _channel;
   Timer? _debounce;
   StreamSubscription<String>? _hubSub;
 
@@ -41,7 +40,6 @@ class _MessagesScreenState extends State<MessagesScreen> {
     super.initState();
     _load();
     _loadHandle();
-    _channel = _repo.subscribe(_scheduleReload);
     _hubSub = RealtimeHub.instance.changes.listen((t) {
       if (const {'messages', 'message_reactions', 'message_hidden', 'groups', 'group_members', 'resume'}.contains(t)) {
         _scheduleReload();
@@ -53,8 +51,6 @@ class _MessagesScreenState extends State<MessagesScreen> {
   void dispose() {
     _hubSub?.cancel();
     _debounce?.cancel();
-    final ch = _channel;
-    if (ch != null) _repo.unsubscribe(ch);
     super.dispose();
   }
 

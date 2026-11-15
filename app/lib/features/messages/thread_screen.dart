@@ -14,6 +14,7 @@ import '../../core/widgets/post_media.dart';
 import '../../core/widgets/swifs_skeleton.dart';
 import '../../core/data/social.dart';
 import '../../core/data/models.dart';
+import '../../core/widgets/route_defer.dart';
 
 const Color _kPrimary = Color(0xFFFF6B35);
 const Color _kInk = Color(0xFF111111);
@@ -62,7 +63,6 @@ class _ThreadScreenState extends State<ThreadScreen> {
   final Map<String, Future<String?>> _storyFutures = {};
   DirectMessage? _replyTo;
   bool _loading = true;
-  RealtimeChannel? _channel;
   Timer? _debounce;
   StreamSubscription<String>? _hubSub;
 
@@ -71,8 +71,10 @@ class _ThreadScreenState extends State<ThreadScreen> {
   @override
   void initState() {
     super.initState();
-    _load();
-    _channel = _repo.subscribe(_scheduleReload);
+    // Load after the slide-in finishes so the transition stays smooth.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) runAfterRouteAnimation(context, () { if (mounted) _load(); });
+    });
     _hubSub = RealtimeHub.instance.changes.listen((t) {
       if (const {'messages', 'message_reactions', 'message_hidden', 'groups', 'group_members', 'resume'}.contains(t)) {
         _scheduleReload();
@@ -84,8 +86,6 @@ class _ThreadScreenState extends State<ThreadScreen> {
   void dispose() {
     _hubSub?.cancel();
     _debounce?.cancel();
-    final ch = _channel;
-    if (ch != null) _repo.unsubscribe(ch);
     _input.dispose();
     super.dispose();
   }

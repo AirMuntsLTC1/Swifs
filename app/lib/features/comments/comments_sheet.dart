@@ -6,6 +6,7 @@ import '../../core/network/interaction_queue.dart';
 import '../../core/widgets/pop_heart.dart';
 import '../../core/widgets/user_avatar.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../core/widgets/keyboard_inset.dart';
 
 const Color kPrimary = Color(0xFFFF6B35);
 const Color kInk = Color(0xFF111111);
@@ -235,12 +236,7 @@ class _CommentsSheetState extends State<CommentsSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final media = MediaQuery.of(context);
-    final keyboard = media.viewInsets.bottom;
-    final safeBottom = keyboard > 0 ? 0.0 : media.padding.bottom;
-
-    return Padding(
-      padding: EdgeInsets.only(bottom: keyboard),
+    return KeyboardInset(
       child: DraggableScrollableSheet(
         initialChildSize: 0.75,
         minChildSize: 0.45,
@@ -255,7 +251,14 @@ class _CommentsSheetState extends State<CommentsSheet> {
             children: [
               _header(),
               Expanded(child: _body(scroll)),
-              _composer(safeBottom),
+              Builder(builder: (ctx) {
+                final keyboard = MediaQuery.viewInsetsOf(ctx).bottom;
+                final safe = keyboard > 0 ? 0.0 : MediaQuery.paddingOf(ctx).bottom;
+                return ValueListenableBuilder<TextEditingValue>(
+                  valueListenable: _input,
+                  builder: (_, __, ___) => _composer(safe),
+                );
+              }),
             ],
           ),
         ),
@@ -467,7 +470,6 @@ class _CommentsSheetState extends State<CommentsSheet> {
               Expanded(
                 child: TextField(
                   controller: _input,
-                  onChanged: (_) => setState(() {}),
                   onSubmitted: (_) => _send(),
                   textInputAction: TextInputAction.send,
                   style: const TextStyle(fontSize: 14, color: kInk),

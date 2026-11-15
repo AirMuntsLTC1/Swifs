@@ -5,6 +5,7 @@ import '../../core/theme/swifs_icon.dart';
 import '../../core/widgets/user_avatar.dart';
 import 'create_group_screen.dart';
 import '../../core/widgets/swifs_skeleton.dart';
+import '../../core/widgets/keyboard_inset.dart';
 
 const Color kPrimary = Color(0xFFFF6B35);
 const Color kInk = Color(0xFF111111);
@@ -64,20 +65,24 @@ class _ShareBottomSheetState extends State<ShareBottomSheet> {
     if (result != null && mounted) Navigator.pop(context); // Close sheet if group was sent
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final filtered = _users.where((u) {
-      final q = _search.text.toLowerCase();
+  /// The users that match the search text. Only the list calls this, on each keystroke.
+  List<Map<String, dynamic>> _filter(String text) {
+    final q = text.toLowerCase();
+    return _users.where((u) {
       return (u['username'] ?? '').toString().toLowerCase().contains(q) ||
              (u['display_name'] ?? '').toString().toLowerCase().contains(q);
     }).toList();
+  }
 
-    final keyboard = MediaQuery.of(context).viewInsets.bottom;
-    final screenH = MediaQuery.of(context).size.height;
-    return Padding(
-      padding: EdgeInsets.only(bottom: keyboard),
+  @override
+  Widget build(BuildContext context) {
+    // The sheet takes 85% of the space above the keyboard. KeyboardInset lifts it,
+    // and FractionallySizedBox sizes it. Neither needs the sheet to rebuild.
+    return KeyboardInset(
+      child: FractionallySizedBox(
+      heightFactor: 0.85,
+      alignment: Alignment.bottomCenter,
       child: Container(
-      height: (screenH - keyboard) * 0.85,
       decoration: const BoxDecoration(color: Colors.white, borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       child: Column(
         children: [
@@ -96,7 +101,6 @@ class _ShareBottomSheetState extends State<ShareBottomSheet> {
                     decoration: BoxDecoration(color: const Color(0xFFF0F2F5), borderRadius: BorderRadius.circular(12)),
                     child: TextField(
                       controller: _search,
-                      onChanged: (_) => setState(() {}),
                       decoration: const InputDecoration(
                         hintText: 'Search',
                         hintStyle: TextStyle(color: kMuted),
@@ -158,7 +162,11 @@ class _ShareBottomSheetState extends State<ShareBottomSheet> {
           Expanded(
             child: _loading
                 ? const LoadingList()
-                : ListView.builder(
+                : ValueListenableBuilder<TextEditingValue>(
+                    valueListenable: _search,
+                    builder: (_, value, __) {
+                      final filtered = _filter(value.text);
+                      return ListView.builder(
                     itemCount: filtered.length,
                     itemBuilder: (_, i) {
                       final u = filtered[i];
@@ -180,6 +188,8 @@ class _ShareBottomSheetState extends State<ShareBottomSheet> {
                             child: isSelected ? const Icon(Icons.check, size: 16, color: Colors.white) : null,
                           ),
                         ),
+                      );
+                    },
                       );
                     },
                   ),
@@ -217,6 +227,7 @@ class _ShareBottomSheetState extends State<ShareBottomSheet> {
           ),
         ],
       ),
+    ),
     ),
     );
   }

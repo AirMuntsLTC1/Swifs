@@ -9,6 +9,7 @@ import '../../core/widgets/post_media.dart';
 import '../../core/widgets/user_avatar.dart';
 import '../messages/thread_screen.dart';
 import '../../core/widgets/swifs_skeleton.dart';
+import '../../core/widgets/route_defer.dart';
 
 const Color kPrimary = Color(0xFFFF6B35);
 const Color kBlue = Color(0xFF1877F2);
@@ -41,7 +42,10 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
       WidgetsBinding.instance.addPostFrameCallback((_) => _goToMyProfile());
       return;
     }
-    _load();
+    // Load after the slide-in finishes so the transition stays smooth.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) runAfterRouteAnimation(context, () { if (mounted) _load(); });
+    });
   }
 
   /// Returns to the main screens and slides to the Profile tab.

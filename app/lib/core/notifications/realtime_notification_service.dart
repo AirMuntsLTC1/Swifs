@@ -24,7 +24,7 @@ class RealtimeHub {
   static const List<String> watchedTables = [
     'posts', 'post_media', 'post_likes', 'post_saves', 'comments', 'comment_likes',
     'follows', 'profiles', 'stories', 'story_views', 'story_reactions', 'story_replies',
-    'message_reactions', 'message_hidden', 'groups', 'group_members',
+    'messages', 'message_reactions', 'message_hidden', 'groups', 'group_members',
     'blocked_users', 'restricted_users', 'notes',
   ];
 
@@ -273,5 +273,3 @@ class RealtimeNotificationService {
   void startListening() => RealtimeHub.instance.start();
   void stopListening() => RealtimeHub.instance.stop();
 }
-
-
