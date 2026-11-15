@@ -104,6 +104,10 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         return ' saved your post. ';
       case 'message':
         return ' sent you a message. ';
+      case 'storyReact':
+        return ' reacted to your story. ';
+      case 'storyReply':
+        return ' replied to your story. ';
       default:
         return ' sent you a notification. ';
     }
