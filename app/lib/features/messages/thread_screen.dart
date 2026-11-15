@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../core/notifications/realtime_notification_service.dart';
 import '../profile/user_profile_screen.dart';
@@ -35,6 +34,18 @@ String _stamp(DateTime t) {
   final ap = t.hour < 12 ? 'AM' : 'PM';
   return '${months[t.month - 1]} ${t.day}, $h:$mm $ap';
 }
+
+/// Everything a thread bubble shows, as text. Equal text means nothing visible changed.
+String _threadSig(List<DirectMessage> list) => list.map((m) {
+      final reacts = m.reactions.entries.map((e) => '${e.key}:${e.value}').toList()..sort();
+      final mine = m.myReactions.toList()..sort();
+      return [
+        m.id, m.text, m.senderId, m.createdAt.millisecondsSinceEpoch,
+        m.readAt?.millisecondsSinceEpoch, m.pinnedAt?.millisecondsSinceEpoch,
+        m.pending, m.failed, m.replyToId, m.sharedPostId, m.storyId,
+        reacts.join(','), mine.join(','),
+      ].join('|');
+    }).join('\n');
 
 class ThreadScreen extends StatefulWidget {
   final String otherId;
@@ -108,18 +119,22 @@ class _ThreadScreenState extends State<ThreadScreen> {
       if (!mounted) return;
       // The server sends newest first. The thread keeps oldest first, so the newest sits at the bottom.
       final ordered = list.reversed.toList();
-      setState(() {
-        // Keep messages still sending or failed, so they stay visible until they are sent or retried.
-        final pending = _messages.where((m) => m.pending || m.failed).toList();
-        if (_knownIds.isNotEmpty) {
-          for (final m in ordered) {
-            if (!_knownIds.contains(m.id)) _animateIds.add(m.id);
+      // Keep messages still sending or failed, so they stay visible until they are sent or retried.
+      final pending = _messages.where((m) => m.pending || m.failed).toList();
+      final next = [...ordered, ...pending];
+      // Rebuild only when the thread would look different.
+      if (_loading || _threadSig(next) != _threadSig(_messages)) {
+        setState(() {
+          if (_knownIds.isNotEmpty) {
+            for (final m in ordered) {
+              if (!_knownIds.contains(m.id)) _animateIds.add(m.id);
+            }
           }
-        }
-        _knownIds.addAll(ordered.map((m) => m.id));
-        _messages = [...ordered, ...pending];
-        _loading = false;
-      });
+          _knownIds.addAll(ordered.map((m) => m.id));
+          _messages = next;
+          _loading = false;
+        });
+      }
       unawaited(_repo.markRead(widget.otherId).catchError((_) {}));
     } catch (_) {
       if (mounted) setState(() => _loading = false);

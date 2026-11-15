@@ -24,7 +24,9 @@ class RealtimeHub {
   static const List<String> watchedTables = [
     'posts', 'post_media', 'post_likes', 'post_saves', 'comments', 'comment_likes',
     'follows', 'profiles', 'stories', 'story_views', 'story_reactions', 'story_replies',
-    'messages', 'message_reactions', 'message_hidden', 'groups', 'group_members',
+    // 'messages' is not listed here: it has its own bindings below (insert, update, delete),
+    // so every message event reaches the screens exactly once.
+    'message_reactions', 'message_hidden', 'groups', 'group_members',
     'blocked_users', 'restricted_users', 'notes',
   ];
 
@@ -35,6 +37,11 @@ class RealtimeHub {
   String? _userId;
   bool _permissionAsked = false;
   Timer? _restartTimer;
+  // Reconnect wait grows with each failed try: 3, 6, 12, 24, 48, then 60 seconds.
+  static const List<int> _retryDelays = [3, 6, 12, 24, 48, 60];
+  int _attempt = 0;
+  // True after a drop (or a forced restart). The next successful connect tells screens to catch up.
+  bool _dropped = false;
 
   bool get isRunning => _channelRef != null;
 
@@ -44,7 +51,8 @@ class RealtimeHub {
     final me = client.auth.currentUser?.id;
     if (me == null) return;
     if (_channelRef != null && _userId == me) return;
-    stop();
+    _restartTimer?.cancel();
+    _detach();
     _askPermission();
 
     _userId = me;
@@ -99,38 +107,63 @@ class RealtimeHub {
       },
     );
 
-    channel.subscribe(_onStatus);
+    channel.subscribe((status, error) => _onStatus(channel, status, error));
     _channelRef = channel;
     unawaited(PushService.instance.register());
   }
 
-  /// Logs the connection state and reconnects if the channel fails or times out.
-  void _onStatus(RealtimeSubscribeStatus status, Object? error) {
+  /// Logs the connection state and retries a dropped connection with a growing wait.
+  /// Events from a channel that was already replaced or closed on purpose are ignored.
+  void _onStatus(RealtimeChannel channel, RealtimeSubscribeStatus status, Object? error) {
+    if (!identical(channel, _channelRef)) return;
     debugPrint('Realtime status: $status${error == null ? '' : ' ($error)'}');
+
+    if (status == RealtimeSubscribeStatus.subscribed) {
+      _attempt = 0;
+      _restartTimer?.cancel();
+      if (_dropped) {
+        // Back after a drop: open screens catch up once. Not sent on the very first connect.
+        _dropped = false;
+        _changes.add('resume');
+      }
+      return;
+    }
+
     if (status == RealtimeSubscribeStatus.channelError ||
         status == RealtimeSubscribeStatus.timedOut ||
         status == RealtimeSubscribeStatus.closed) {
+      _dropped = true;
       _restartTimer?.cancel();
-      _restartTimer = Timer(const Duration(seconds: 3), () {
-        _channelRef = null;
-        _userId = null;
+      final i = _attempt < _retryDelays.length ? _attempt : _retryDelays.length - 1;
+      _attempt++;
+      _restartTimer = Timer(Duration(seconds: _retryDelays[i]), () {
+        _detach();
         start();
       });
     }
   }
 
-  /// Rebuilds the live connection and tells open screens to reload.
+  /// Rebuilds the live connection, for example after the app returns to the foreground.
+  /// The next successful connection tells open screens to catch up.
   void restart() {
-    stop();
-    _channelRef = null;
-    _userId = null;
+    _restartTimer?.cancel();
+    _attempt = 0;
+    _dropped = true;
+    _detach();
     start();
-    _changes.add('resume');
   }
 
   /// Disconnects (on sign-out).
   void stop() {
     _restartTimer?.cancel();
+    _restartTimer = null;
+    _attempt = 0;
+    _dropped = false;
+    _detach();
+  }
+
+  /// Removes the current channel. Its close event is ignored by [_onStatus].
+  void _detach() {
     final ch = _channelRef;
     _channelRef = null;
     _userId = null;

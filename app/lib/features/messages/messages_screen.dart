@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../core/notifications/realtime_notification_service.dart';
 import 'package:lucide_icons_flutter_plus/lucide_icons_flutter_plus.dart';
@@ -35,12 +34,16 @@ class _MessagesScreenState extends State<MessagesScreen> {
   String _myHandle = '';
   Timer? _debounce;
   StreamSubscription<String>? _hubSub;
+  String? _lastSig;
+  String _lastAgo = '';
+  Timer? _ticker;
 
   @override
   void initState() {
     super.initState();
     _load();
     _loadHandle();
+    _ticker = Timer.periodic(const Duration(seconds: 30), (_) => _tickAges());
     _hubSub = RealtimeHub.instance.changes.listen((t) {
       if (const {'messages', 'message_reactions', 'message_hidden', 'groups', 'group_members', 'resume'}.contains(t)) {
         _scheduleReload();
@@ -53,6 +56,7 @@ class _MessagesScreenState extends State<MessagesScreen> {
     _hubSub?.cancel();
     _searchCtrl.dispose();
     _debounce?.cancel();
+    _ticker?.cancel();
     super.dispose();
   }
 
@@ -78,14 +82,44 @@ class _MessagesScreenState extends State<MessagesScreen> {
     try {
       final results = await Future.wait([_repo.fetchInbox(), _repo.fetchNotes()]);
       if (!mounted) return;
+      final all = results[0] as List<Conversation>;
+      final notes = results[1] as List<NoteItem>;
+      final sig = _signature(all, notes);
+      // Rebuild only when something on screen would look different.
+      if (!_loading && sig == _lastSig) return;
+      _lastSig = sig;
       setState(() {
-        _all = results[0] as List<Conversation>;
-        _notes = results[1] as List<NoteItem>;
+        _all = all;
+        _notes = notes;
         _loading = false;
+        _lastAgo = _agoLabels();
       });
     } catch (_) {
-      if (mounted) setState(() => _loading = false);
+      if (mounted && _loading) setState(() => _loading = false);
     }
+  }
+
+  /// Everything the list and notes show, as text. Equal text means nothing visible changed.
+  String _signature(List<Conversation> all, List<NoteItem> notes) {
+    final rows = all.map((c) => [
+          c.otherId, c.last.id, c.last.senderId, c.last.text,
+          c.last.createdAt.millisecondsSinceEpoch, c.unread, c.label,
+          c.username, c.avatarUrl, c.tier,
+        ].join('|'));
+    final nts = notes.map((n) => [
+          n.userId, n.text, n.createdAt.millisecondsSinceEpoch, n.label, n.avatarUrl,
+        ].join('|'));
+    return '${rows.join('\n')}##${nts.join('\n')}';
+  }
+
+  String _agoLabels() => _all.map((c) => _ago(c.last.createdAt)).join('|');
+
+  /// Keeps the "3m" style ages current. Rebuilds only when a label's text has changed.
+  void _tickAges() {
+    if (!mounted) return;
+    final now = _agoLabels();
+    if (now == _lastAgo) return;
+    setState(() => _lastAgo = now);
   }
 
   List<Conversation> get _visible {
