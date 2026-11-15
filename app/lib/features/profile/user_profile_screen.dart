@@ -163,7 +163,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                           // Action Buttons
                           Row(
                             children: [
-                              Expanded(
+                              if (!_isMe) Expanded(
                                 child: GestureDetector(
                                   onTap: _toggleFollow,
                                   child: Container(

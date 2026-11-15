@@ -6,6 +6,7 @@ import 'package:lucide_icons_flutter_plus/lucide_icons_flutter_plus.dart';
 import '../../core/data/social.dart';
 import '../../core/widgets/user_avatar.dart';
 import '../../core/widgets/swifs_skeleton.dart';
+import '../../core/auth/current_user.dart';
 
 const Color kPrimary = Color(0xFFFF6B35);
 
@@ -44,7 +45,7 @@ class _SearchScreenState extends State<SearchScreen> {
           : await social.searchUsers(query);
       if (!mounted || id != _requestId) return;
       setState(() {
-        _users = users;
+        _users = users.where((u) => !isMyAccount(u['id'])).toList();
         _loading = false;
         _error = null;
       });
@@ -176,7 +177,7 @@ class _SearchScreenState extends State<SearchScreen> {
                   ],
                 ),
               ),
-              GestureDetector(
+              if (!isMyAccount(user['id'])) GestureDetector(
                 onTap: () => _toggleFollow(i),
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 150),

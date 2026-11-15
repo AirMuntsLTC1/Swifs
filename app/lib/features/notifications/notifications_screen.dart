@@ -10,6 +10,7 @@ import '../../core/theme/swifs_icon.dart';
 import '../../core/widgets/user_avatar.dart';
 import '../../core/widgets/swifs_skeleton.dart';
 import '../messages/thread_screen.dart';
+import '../../core/auth/current_user.dart';
 
 const Color kPrimary = Color(0xFFFF6B35);
 const Color kInk = Color(0xFF111111);
@@ -116,6 +117,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   /// The button on the right. Messages get Message. Follow rows keep Message or Follow back.
   /// Other activity (likes, comments) has no button.
   Widget? _trailing(NotificationModel item) {
+    if (isMyAccount(item.actorId)) return null;
     if (item.type == 'message') return _messageButton(item);
     if (!item.type.startsWith('follow')) return null;
     return item.isFollowing

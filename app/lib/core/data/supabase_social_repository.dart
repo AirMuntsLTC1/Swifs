@@ -7,6 +7,7 @@ import '../cache/local_cache.dart';
 import '../media/image_prep.dart';
 import 'models.dart';
 import 'social_repository.dart';
+import '../auth/current_user.dart';
 
 /// Reads and writes the Supabase tables: posts, post_media, profiles, comments,
 /// post_likes, post_saves, follows, comment_likes, trending_tags.
@@ -769,7 +770,9 @@ class SupabaseSocialRepository implements SocialRepository {
             preview: r['preview']?.toString(),
           );
         }).toList();
-        return built.where((n) => !n.type.startsWith('follow') || followers.contains(n.actorId)).toList();
+        return built.where((n) =>
+            !isMyAccount(n.actorId) &&
+            (!n.type.startsWith('follow') || followers.contains(n.actorId))).toList();
       });
 
   @override

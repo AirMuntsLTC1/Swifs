@@ -27,6 +27,7 @@ import '../../core/widgets/count_text.dart';
 import '../../core/native/swifs_ffi.dart';
 import '../../core/notifications/realtime_notification_service.dart';
 import '../../core/widgets/swifs_skeleton.dart';
+import '../../core/auth/current_user.dart';
 
 const Color kPrimary = Color(0xFFFF6B35);
 
@@ -558,7 +559,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       ],
                     ),
                     const Spacer(),
-                    GestureDetector(
+                    if (!isMyAccount(p['authorId'])) GestureDetector(
                       onTap: () => _handleFollow(i),
                       child: AnimatedContainer(
                         duration: const Duration(milliseconds: 150),
