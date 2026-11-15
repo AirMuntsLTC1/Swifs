@@ -60,7 +60,11 @@ class _PostMediaState extends State<PostMedia> {
     });
     try {
       await c.initialize().timeout(const Duration(seconds: 20));
-      if (!mounted) return;
+      // The video may have scrolled away while loading. Free it instead of keeping it.
+      if (!mounted || _controller != c) {
+        c.dispose();
+        return;
+      }
       await c.setLooping(true);
       await c.setVolume(_muted ? 0 : 1);
       c.addListener(_onTick);
@@ -107,7 +111,26 @@ class _PostMediaState extends State<PostMedia> {
       _playWhenReady();
     } else {
       _wantPlay = false;
-      _controller?.pause();
+      _releasePlayer();
+    }
+  }
+
+  /// Frees the native player (decoder and buffers) when the video scrolls out of view.
+  /// The poster stays on screen, so the feed never shows an empty box. The video
+  /// loads again when it comes back into view. Keeping many players alive is what
+  /// made long feeds stutter.
+  void _releasePlayer() {
+    final c = _controller;
+    if (c == null) return;
+    _controller = null;
+    c.removeListener(_onTick);
+    c.dispose();
+    if (mounted) {
+      setState(() {
+        _ready = false;
+        _loading = false;
+        _playing = false;
+      });
     }
   }
 
