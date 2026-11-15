@@ -85,6 +85,72 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     );
   }
 
+  /// The sentence after the name, by notification type.
+  String _actionText(NotificationModel item) {
+    switch (item.type) {
+      case 'follow':
+        return ' started following you. ';
+      case 'follow_request':
+        return ' wants to follow you. ';
+      case 'follow_accept':
+        return ' accepted your follow request. ';
+      case 'like':
+        return ' liked your post. ';
+      case 'comment':
+        return ' commented on your post. ';
+      case 'comment_like':
+        return ' liked your comment. ';
+      case 'save':
+        return ' saved your post. ';
+      case 'message':
+        return ' sent you a message. ';
+      default:
+        return ' sent you a notification. ';
+    }
+  }
+
+  /// The button on the right. Messages get Message. Follow rows keep Message or Follow back.
+  /// Other activity (likes, comments) has no button.
+  Widget? _trailing(NotificationModel item) {
+    if (item.type == 'message') return _messageButton(item);
+    if (!item.type.startsWith('follow')) return null;
+    return item.isFollowing
+                          ? GestureDetector(
+                              onTap: () => _openThread(item),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFF0F2F5),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: const Text('Message', style: TextStyle(color: kInk, fontSize: 13, fontWeight: FontWeight.w600)),
+                              ),
+                            )
+                          : GestureDetector(
+                              onTap: () => _toggleFollow(item),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                decoration: BoxDecoration(
+                                  color: kPrimary,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: const Text('Follow back', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600)),
+                              ),
+                            );
+  }
+
+  Widget _messageButton(NotificationModel item) => GestureDetector(
+        onTap: () => _openThread(item),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF0F2F5),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: const Text('Message', style: TextStyle(color: kInk, fontSize: 13, fontWeight: FontWeight.w600)),
+        ),
+      );
+
   Future<void> _confirmDeleteAll() async {
     final ok = await showDialog<bool>(
       context: context,
@@ -178,34 +244,12 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                           style: const TextStyle(color: kInk, fontSize: 14),
                           children: [
                             TextSpan(text: item.actorUsername, style: const TextStyle(fontWeight: FontWeight.w600)),
-                            TextSpan(text: ' started following you. '),
+                            TextSpan(text: _actionText(item)),
                             TextSpan(text: item.timeAgo, style: const TextStyle(color: kMuted)),
                           ],
                         ),
                       ),
-                      trailing: item.isFollowing
-                          ? GestureDetector(
-                              onTap: () => _openThread(item),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFF0F2F5),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: const Text('Message', style: TextStyle(color: kInk, fontSize: 13, fontWeight: FontWeight.w600)),
-                              ),
-                            )
-                          : GestureDetector(
-                              onTap: () => _toggleFollow(item),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                                decoration: BoxDecoration(
-                                  color: kPrimary,
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: const Text('Follow back', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600)),
-                              ),
-                            ),
+                      trailing: _trailing(item),
                     );
                   },
                 ),
@@ -323,7 +367,3 @@ class _ActionSheet extends StatelessWidget {
     );
   }
 }
-
-
-
-

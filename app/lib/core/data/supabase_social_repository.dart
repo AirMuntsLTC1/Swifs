@@ -713,7 +713,7 @@ class SupabaseSocialRepository implements SocialRepository {
         final me = _me;
         final rows = await _db
             .from('notifications')
-            .select('id, type, actor_handle, actor_name, avatar_url, post_id, comment_id, created_at')
+            .select('id, type, actor_handle, actor_name, avatar_url, post_id, comment_id, preview, created_at')
             .eq('user_id', me)
             .order('created_at', ascending: false)
             .limit(100);
@@ -745,8 +745,11 @@ class SupabaseSocialRepository implements SocialRepository {
 
         final followRows = await _db.from('follows').select('followee').eq('follower', me);
         final following = {for (final r in followRows) r['followee'].toString()};
+        // Only people who follow you right now can show a follow notification.
+        final followerRows = await _db.from('follows').select('follower').eq('followee', me);
+        final followers = {for (final r in followerRows) r['follower'].toString()};
 
-        return unique.map((r) {
+        final built = unique.map((r) {
           final handle = _cleanHandle(r['actor_handle']);
           final prof = profileMap[handle.toLowerCase()] ?? <String, dynamic>{};
           final actorId = (prof['id'] ?? '').toString();
@@ -763,8 +766,10 @@ class SupabaseSocialRepository implements SocialRepository {
             actorAvatarUrl: avatar,
             timeAgo: formatAge(_ageMinutes(r['created_at'])),
             isFollowing: following.contains(actorId),
+            preview: r['preview']?.toString(),
           );
         }).toList();
+        return built.where((n) => !n.type.startsWith('follow') || followers.contains(n.actorId)).toList();
       });
 
   @override

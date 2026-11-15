@@ -235,6 +235,8 @@ class NotificationModel {
   final String? actorAvatarUrl;
   final String timeAgo;
   bool isFollowing;
+  /// Short text of a message notification (the start of the message).
+  final String? preview;
 
   NotificationModel({
     required this.id,
@@ -244,6 +246,7 @@ class NotificationModel {
     this.actorAvatarUrl,
     required this.timeAgo,
     this.isFollowing = false,
+    this.preview,
   });
 }
 
