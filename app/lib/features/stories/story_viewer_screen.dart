@@ -149,7 +149,7 @@ class _StoryViewerScreenState extends State<StoryViewerScreen> with SingleTicker
                   : story.isVideo
                       ? StoryVideoCanvas(url: story.photoUrl)
                       : StoryCanvas(
-                          image: CachedNetworkImageProvider(story.photoUrl),
+                          image: CachedNetworkImageProvider(story.photoUrl, maxWidth: 1080),
                           layers: story.layers,
                         ),
             ),

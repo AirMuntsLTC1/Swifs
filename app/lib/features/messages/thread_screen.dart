@@ -523,7 +523,7 @@ class _ThreadScreenState extends State<ThreadScreen> {
                     clipBehavior: Clip.antiAlias,
                     child: url == null || url.isEmpty
                         ? const SizedBox.shrink()
-                        : CachedNetworkImage(imageUrl: url, fit: BoxFit.cover),
+                        : CachedNetworkImage(imageUrl: url, fit: BoxFit.cover, memCacheWidth: 240),
                   ),
                   const SizedBox(width: 6),
                   Text(
@@ -831,6 +831,7 @@ class SharedPostWidget extends StatelessWidget {
                           : CachedNetworkImage(
                               imageUrl: thumb,
                               fit: BoxFit.cover,
+                              memCacheWidth: 480,
                               placeholder: (_, __) => const SwifsSkeletonBox(),
                               errorWidget: (_, __, ___) => Container(color: Colors.grey.shade300),
                             ),

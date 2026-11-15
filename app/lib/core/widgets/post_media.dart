@@ -147,6 +147,8 @@ class _PostMediaState extends State<PostMedia> {
     return CachedNetworkImage(
       imageUrl: url,
       fit: BoxFit.cover,
+      // Decode at about screen width, not full camera resolution. Keeps scrolling smooth.
+      memCacheWidth: 900,
       placeholder: (_, __) => const SwifsSkeletonBox(),
       errorWidget: (_, __, ___) => Container(
         color: _kTile,
@@ -268,6 +270,7 @@ class PostGridTile extends StatelessWidget {
               ? (post.mediaType == 'video' ? const VideoPosterTile() : Container(color: _kTile, child: const Center(child: SwifsIcon(LucideIcons.image, color: Colors.grey))))
               : CachedNetworkImage(
                   imageUrl: url, fit: BoxFit.cover,
+                  memCacheWidth: 360,
                   placeholder: (_, __) => Container(color: _kTile),
                   errorWidget: (_, __, ___) => Container(color: _kTile, child: const Center(child: SwifsIcon(LucideIcons.image, color: Colors.grey))),
                 ),

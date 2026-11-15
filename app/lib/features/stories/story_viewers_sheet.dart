@@ -5,6 +5,7 @@ import '../../core/data/social.dart';
 import '../../core/theme/swifs_icon.dart';
 import '../../core/widgets/user_avatar.dart';
 import '../../core/widgets/swifs_skeleton.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 const Color kPrimary = Color(0xFFFF6B35);
 const Color kInk = Color(0xFF111111);
@@ -71,7 +72,7 @@ class _StoryViewersSheetState extends State<StoryViewersSheet> {
                     width: 100, height: 160,
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(12),
-                      image: DecorationImage(image: NetworkImage(widget.photoUrl!), fit: BoxFit.cover),
+                      image: DecorationImage(image: CachedNetworkImageProvider(widget.photoUrl!, maxWidth: 300), fit: BoxFit.cover),
                     ),
                   ),
                 const SizedBox(width: 16),

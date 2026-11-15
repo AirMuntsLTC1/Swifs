@@ -5,6 +5,7 @@ import '../../core/data/settings_repository.dart';
 import 'package:lucide_icons_flutter_plus/lucide_icons_flutter_plus.dart';
 import '../../core/theme/swifs_icon.dart';
 import '../../core/widgets/swifs_skeleton.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 const Color kPrimary = Color(0xFFFF6B35);
 const Color kInk = Color(0xFF111111);
@@ -556,7 +557,7 @@ class _BlockedPageState extends State<_BlockedPage> {
           return ListTile(
             leading: CircleAvatar(
               backgroundColor: kLine,
-              backgroundImage: hasAvatar ? NetworkImage(avatar) : null,
+              backgroundImage: hasAvatar ? CachedNetworkImageProvider(avatar, maxWidth: 200, maxHeight: 200) : null,
               child: hasAvatar
                   ? null
                   : Text(
