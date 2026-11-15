@@ -1,10 +1,10 @@
 import 'dart:io';
 import 'dart:typed_data';
-import 'dart:ui' as ui;
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 import 'package:video_thumbnail/video_thumbnail.dart';
 import '../cache/local_cache.dart';
+import '../media/image_prep.dart';
 import 'models.dart';
 import 'social_repository.dart';
 
@@ -821,20 +821,6 @@ class SupabaseSocialRepository implements SocialRepository {
     }
   }
 
-  /// Resizes an image to about 480px wide and returns PNG bytes. Null if it can't be decoded.
-  Future<Uint8List?> _imageThumb(File file) async {
-    try {
-      final bytes = await file.readAsBytes();
-      final codec = await ui.instantiateImageCodec(bytes, targetWidth: 480);
-      final frame = await codec.getNextFrame();
-      final data = await frame.image.toByteData(format: ui.ImageByteFormat.png);
-      frame.image.dispose();
-      return data?.buffer.asUint8List();
-    } catch (_) {
-      return null;
-    }
-  }
-
   @override
   Future<FeedPost?> fetchPostPreview(String postId) => _guard(() async {
         final rows = await _db.from('posts').select(_postSelect).eq('id', postId).limit(1);
@@ -842,20 +828,6 @@ class SupabaseSocialRepository implements SocialRepository {
         final list = await _hydrate(rows.map((e) => Map<String, dynamic>.from(e)).toList());
         return list.isEmpty ? null : list.first;
       });
-
-  /// The real width and height of an image (0, 0 if it cannot be read).
-  Future<(int, int)> _imageSize(File file) async {
-    try {
-      final bytes = await file.readAsBytes();
-      final codec = await ui.instantiateImageCodec(bytes);
-      final frame = await codec.getNextFrame();
-      final size = (frame.image.width, frame.image.height);
-      frame.image.dispose();
-      return size;
-    } catch (_) {
-      return (0, 0);
-    }
-  }
 
   /// The file's extension if we can store it, otherwise [fallback].
   String _extOf(String path, String fallback) {
@@ -931,12 +903,13 @@ class SupabaseSocialRepository implements SocialRepository {
           quality: 75,
         );
       } else {
+        // Decode, rotate and resize on a background isolate (see image_prep.dart).
+        final prep = await prepareImage(path);
         if (width <= 0 || height <= 0) {
-          final size = await _imageSize(file);
-          width = size.$1;
-          height = size.$2;
+          width = prep.width;
+          height = prep.height;
         }
-        thumbBytes = await _imageThumb(file);
+        thumbBytes = prep.thumbJpeg;
       }
     } catch (_) {
       // A thumbnail that cannot be made must not stop the post. The feed shows a poster instead.
@@ -945,12 +918,12 @@ class SupabaseSocialRepository implements SocialRepository {
 
     String? thumbPath;
     if (thumbBytes != null) {
-      final thumbName = isVideo ? '$me/$postId/$i-thumb.jpg' : '$me/$postId/$i-thumb.png';
+      final thumbName = '$me/$postId/$i-thumb.jpg';
       try {
         await bucket.uploadBinary(
           thumbName,
           thumbBytes,
-          fileOptions: FileOptions(contentType: isVideo ? 'image/jpeg' : 'image/png', upsert: true),
+          fileOptions: FileOptions(contentType: 'image/jpeg', upsert: true),
         );
         uploaded.add(thumbName);
         thumbPath = thumbName;
@@ -970,5 +943,3 @@ class SupabaseSocialRepository implements SocialRepository {
     };
   }
 }
-
-
