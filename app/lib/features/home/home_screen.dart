@@ -78,7 +78,8 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     _posts = [];
 
-    // Preload audio for low latency
+    // Low latency mode for the like sound, so taps play without a startup delay.
+    _audioPlayer.setPlayerMode(PlayerMode.lowLatency).catchError((_) {});
     _scroll.addListener(_onScroll);
     _realtimeSub = RealtimeHub.instance.changes.listen(_onRealtime);
     _loadFeed();
@@ -99,13 +100,14 @@ class _HomeScreenState extends State<HomeScreen> {
     super.dispose();
   }
 
+  /// Plays the like sound on the one player this screen owns (low latency mode).
+  /// Creating a new AudioPlayer per tap allocated a native player each time and
+  /// leaked it until it finished, which stuttered the UI on busy scrolling.
   Future<void> _playPopSound() async {
     try {
-      final player = AudioPlayer();
-      await player.play(AssetSource('sounds/bubble_pop.mp3')).catchError((_) {});
-      player.onPlayerComplete.listen((_) => player.dispose());
-    } catch (e) {
-      print('Audio error: $e');
+      await _audioPlayer.play(AssetSource('sounds/bubble_pop.mp3'));
+    } catch (_) {
+      // Sound is optional. A failed pop must never affect the UI.
     }
   }
 
@@ -836,5 +838,3 @@ extension _EmptyFeedBuilder on _HomeScreenState {
     );
   }
 }
-
-

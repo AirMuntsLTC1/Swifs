@@ -11,8 +11,14 @@ typedef _HashUserNative = Int32 Function(Pointer<Utf8>);
 typedef _HashUserDart = int Function(Pointer<Utf8>);
 
 /// Raw calls into libswifs_core (app/native/src/swifs_core.cpp).
+///
+/// Symbols are looked up once and kept in static fields. Looking them up on
+/// every call (as before) costs a dlsym per score, which adds up across a feed.
 class SwifsCore {
   static DynamicLibrary? _lib;
+  static _FeedScoreDart? _feedFn;
+  static _CommentScoreDart? _commentFn;
+  static _HashUserDart? _hashFn;
 
   static DynamicLibrary get lib {
     if (_lib != null) return _lib!;
@@ -26,21 +32,25 @@ class SwifsCore {
     return _lib!;
   }
 
-  static int feedScore(int likes, int comments, int views, int ageMinutes) {
-    final fn = lib.lookupFunction<_FeedScoreNative, _FeedScoreDart>('swifs_feed_score');
-    return fn(likes, comments, views, ageMinutes);
-  }
+  static _FeedScoreDart get _feed =>
+      _feedFn ??= lib.lookupFunction<_FeedScoreNative, _FeedScoreDart>('swifs_feed_score');
 
-  static int commentScore(int likes, int replies, int ageMinutes) {
-    final fn = lib.lookupFunction<_CommentScoreNative, _CommentScoreDart>('swifs_comment_score');
-    return fn(likes, replies, ageMinutes);
-  }
+  static _CommentScoreDart get _comment =>
+      _commentFn ??= lib.lookupFunction<_CommentScoreNative, _CommentScoreDart>('swifs_comment_score');
+
+  static _HashUserDart get _hash =>
+      _hashFn ??= lib.lookupFunction<_HashUserNative, _HashUserDart>('swifs_hash_user');
+
+  static int feedScore(int likes, int comments, int views, int ageMinutes) =>
+      _feed(likes, comments, views, ageMinutes);
+
+  static int commentScore(int likes, int replies, int ageMinutes) =>
+      _comment(likes, replies, ageMinutes);
 
   static int hashUser(String name) {
-    final fn = lib.lookupFunction<_HashUserNative, _HashUserDart>('swifs_hash_user');
     final ptr = name.toNativeUtf8();
     try {
-      return fn(ptr);
+      return _hash(ptr);
     } finally {
       malloc.free(ptr);
     }
@@ -80,5 +90,3 @@ class SwifsScore {
     }
   }
 }
-
-

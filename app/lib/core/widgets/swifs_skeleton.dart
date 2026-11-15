@@ -3,8 +3,25 @@ import 'package:flutter/material.dart';
 const Color _kBase = Color(0xFFEDEFF2);
 const Color _kHighlight = Color(0xFFF8F9FB);
 
-/// A light sweep across its child: the shimmer effect used for loading skeletons.
+/// Carries the current shimmer colour down the tree. Only widgets that read it rebuild
+/// each frame, and nothing is painted through an offscreen layer (the old ShaderMask was).
+class _ShimmerScope extends InheritedWidget {
+  final Color color;
+
+  const _ShimmerScope({required this.color, required super.child});
+
+  static Color colorOf(BuildContext context) {
+    final scope = context.dependOnInheritedWidgetOfExactType<_ShimmerScope>();
+    return scope?.color ?? _kBase;
+  }
+
+  @override
+  bool updateShouldNotify(_ShimmerScope old) => old.color != color;
+}
+
+/// A soft colour pulse across its child: the loading skeleton effect.
 /// Wrap a whole group of skeleton blocks in one [SwifsShimmer] (one animation, not one per block).
+/// The child is built once and reused; only the colour leaves rebuild on each tick.
 class SwifsShimmer extends StatefulWidget {
   final Widget child;
 
@@ -17,8 +34,8 @@ class SwifsShimmer extends StatefulWidget {
 class _SwifsShimmerState extends State<SwifsShimmer> with SingleTickerProviderStateMixin {
   late final AnimationController _controller = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 1400),
-  )..repeat();
+    duration: const Duration(milliseconds: 1200),
+  )..repeat(reverse: true);
 
   @override
   void dispose() {
@@ -28,22 +45,15 @@ class _SwifsShimmerState extends State<SwifsShimmer> with SingleTickerProviderSt
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _controller,
-      child: widget.child,
-      builder: (context, child) {
-        final t = _controller.value * 2 - 1; // -1 to 1 across the loop
-        return ShaderMask(
-          blendMode: BlendMode.srcATop,
-          shaderCallback: (rect) => LinearGradient(
-            begin: Alignment(-1.0 + 2 * t, 0),
-            end: Alignment(1.0 + 2 * t, 0),
-            colors: const [_kBase, _kHighlight, _kBase],
-            stops: const [0.35, 0.5, 0.65],
-          ).createShader(rect),
-          child: child,
-        );
-      },
+    return RepaintBoundary(
+      child: AnimatedBuilder(
+        animation: _controller,
+        child: widget.child,
+        builder: (context, child) => _ShimmerScope(
+          color: Color.lerp(_kBase, _kHighlight, _controller.value)!,
+          child: child!,
+        ),
+      ),
     );
   }
 }
@@ -69,7 +79,7 @@ class SkeletonBox extends StatelessWidget {
       width: width,
       height: height,
       decoration: BoxDecoration(
-        color: _kBase,
+        color: _ShimmerScope.colorOf(context),
         shape: shape,
         borderRadius: shape == BoxShape.circle ? null : BorderRadius.circular(radius),
       ),
@@ -83,7 +93,21 @@ class SwifsSkeletonBox extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const SwifsShimmer(child: ColoredBox(color: _kBase, child: SizedBox.expand()));
+    return const SwifsShimmer(child: _ShimmerFill(expand: true));
+  }
+}
+
+class _ShimmerFill extends StatelessWidget {
+  final bool expand;
+
+  const _ShimmerFill({this.expand = false});
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(color: _ShimmerScope.colorOf(context)),
+      child: expand ? const SizedBox.expand() : null,
+    );
   }
 }
 
@@ -128,7 +152,7 @@ class _FeedCardSkeleton extends StatelessWidget {
             ],
           ),
         ),
-        const AspectRatio(aspectRatio: 4 / 5, child: ColoredBox(color: _kBase)),
+        const AspectRatio(aspectRatio: 4 / 5, child: _ShimmerFill()),
         const SizedBox(height: 12),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -164,7 +188,7 @@ class GridSkeleton extends StatelessWidget {
         physics: const NeverScrollableScrollPhysics(),
         mainAxisSpacing: 2,
         crossAxisSpacing: 2,
-        children: List.generate(count, (_) => const ColoredBox(color: _kBase)),
+        children: List.generate(count, (_) => const _ShimmerFill()),
       ),
     );
   }
