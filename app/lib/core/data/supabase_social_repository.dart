@@ -348,11 +348,20 @@ class SupabaseSocialRepository implements SocialRepository {
     final postIds = posts.map((p) => p['id'].toString()).toList();
     final authorIds = posts.map((p) => p['author_id'].toString()).toSet().toList();
 
-    final profiles = await _profilesFor(authorIds);
-    final counts = await _countsOrEmpty(postIds);
-    final likeRows = await _db.from('post_likes').select('post_id').eq('user_id', me).inFilter('post_id', postIds);
-    final saveRows = await _db.from('post_saves').select('post_id').eq('user_id', me).inFilter('post_id', postIds);
-    final followRows = await _db.from('follows').select('followee').eq('follower', me);
+    // Five independent requests. Run them together, so the feed appears after one
+    // round trip instead of five in a row.
+    final results = await Future.wait<Object>([
+      _profilesFor(authorIds),
+      _countsOrEmpty(postIds),
+      _db.from('post_likes').select('post_id').eq('user_id', me).inFilter('post_id', postIds),
+      _db.from('post_saves').select('post_id').eq('user_id', me).inFilter('post_id', postIds),
+      _db.from('follows').select('followee').eq('follower', me),
+    ]);
+    final profiles = results[0] as Map<String, Map<String, dynamic>>;
+    final counts = results[1] as Map<String, Map<String, int>>;
+    final likeRows = results[2] as List<dynamic>;
+    final saveRows = results[3] as List<dynamic>;
+    final followRows = results[4] as List<dynamic>;
 
     final liked = {for (final r in likeRows) r['post_id'].toString()};
     final saved = {for (final r in saveRows) r['post_id'].toString()};
